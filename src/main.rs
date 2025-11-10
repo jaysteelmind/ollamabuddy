@@ -3,9 +3,12 @@
 use anyhow::Result;
 use clap::Parser;
 use ollamabuddy::{
-    cli::{Args, Commands},
+    cli::{Args, Commands, Verbosity},
     bootstrap::Bootstrap,
     doctor::Doctor,
+    agent::AgentOrchestrator,
+    agent::orchestrator::AgentConfig,
+    tools::ToolRuntime,
 };
 
 #[tokio::main]
@@ -26,20 +29,79 @@ async fn main() -> Result<()> {
             show_config(&args)?;
         }
         None => {
-            println!("OllamaBuddy v0.2.0");
-            println!("
-PRD 1 & 2 Complete - Full agent coming in v0.2.1");
-            println!("
-Available commands:");
-            println!("  doctor  - Run system health checks");
-            println!("  models  - List available Ollama models");
-            println!("  config  - Show current configuration");
-            println!("  clean   - Clear state and logs");
-            println!("
-For help: ollamabuddy --help");
+            // No subcommand - run main agent with task from args
+            if let Some(task) = &args.task {
+                run_agent(&args, task).await?;
+            } else {
+                println!("OllamaBuddy v0.2.1 - Terminal Agent");
+                println!("
+Usage:");
+                println!("  ollamabuddy \"<task>\"          Run agent with task");
+                println!("  ollamabuddy doctor            System health checks");
+                println!("  ollamabuddy models            List Ollama models");
+                println!("  ollamabuddy config            Show configuration");
+                println!("  ollamabuddy clean             Clear state/logs");
+                println!("
+Example:");
+                println!("  ollamabuddy \"List all .rs files and count lines of code\"");
+                println!();
+            }
         }
     }
 
+    Ok(())
+}
+
+
+async fn run_agent(args: &Args, task: &str) -> Result<()> {
+    use std::path::PathBuf;
+    
+    // 1. Bootstrap check
+    let bootstrap = Bootstrap::new(
+        args.host.clone(),
+        args.port,
+        args.model.clone(),
+    );
+    
+    if !bootstrap.check_ollama_running().await? {
+        eprintln!("❌ Ollama is not running!");
+        eprintln!("
+Start Ollama with: ollama serve");
+        std::process::exit(2);
+    }
+    
+    // 2. Initialize components
+    let working_dir = args.cwd.clone().unwrap_or_else(|| {
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    });
+    
+    let ollama_url = format!("http://{}:{}", args.host, args.port);
+    
+    let config = AgentConfig {
+        ollama_url,
+        model: args.model.clone(),
+        max_iterations: 10,
+        verbose: matches!(args.verbosity(), Verbosity::Verbose | Verbosity::VeryVerbose),
+    };
+    
+    let mut orchestrator = AgentOrchestrator::new(config)?;
+    let tool_runtime = ToolRuntime::new(&working_dir)?;
+    
+    // 3. Set up agent with task
+    orchestrator.add_user_goal(task.to_string());
+    
+    println!("🤖 OllamaBuddy Agent Starting...");
+    println!("📋 Task: {}", task);
+    println!("📁 Working Directory: {:?}", working_dir);
+    println!("🔧 Available Tools: {}", tool_runtime.tool_names().join(", "));
+    println!();
+    
+    // 4. Main agent loop (simplified for now)
+    println!("⚙️  Agent execution loop not yet implemented");
+    println!("✅ Components initialized successfully!");
+    println!("
+Next: Implement streaming loop + tool execution");
+    
     Ok(())
 }
 
