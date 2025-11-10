@@ -1,6 +1,10 @@
 # OllamaBuddy v0.2 - Terminal Agent Platform
 
-Install: curl -fsSL https://raw.githubusercontent.com/jaysteelmind/ollamabuddy/main/install.sh | sh
+Install:
+```bash
+curl -fsSL https://raw.githubusercontent.com/jaysteelmind/ollamabuddy/main/install.sh | sh
+```
+(triple backticks)
 
 A production-ready Rust terminal agent that transforms local Ollama language models into capable autonomous assistants.
 
