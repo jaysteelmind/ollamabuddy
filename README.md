@@ -171,6 +171,24 @@ This project follows **Top 2% Engineering Standards** (Level 10):
 - Zero technical debt
 - Production-ready code only
 
+## Uninstall
+
+To remove OllamaBuddy:
+```bash
+curl -fsSL https://raw.githubusercontent.com/jaysteelmind/ollamabuddy/main/uninstall.sh | sh
+```
+
+This will:
+- Remove the OllamaBuddy binary
+- Optionally remove configuration (~/.ollamabuddy)
+- Optionally remove Ollama (if not needed by other apps)
+- Optionally remove downloaded models
+
+**Manual removal:**
+```bash
+sudo rm /usr/local/bin/ollamabuddy
+rm -rf ~/.ollamabuddy
+
 ## License
 
 [Add your license here]
