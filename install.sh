@@ -446,9 +446,9 @@ main() {
     
     if ! check_model; then
         echo ""
-        read -p "Download default model ${DEFAULT_MODEL} (3.8GB)? [Y/n] " -n 1 -r
-        echo ""
-        if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
+        printf "Download default model ${DEFAULT_MODEL} (3.8GB)? [Y/n] "
+        read REPLY
+        if [ "$REPLY" = "Y" ] || [ "$REPLY" = "y" ] || [ -z "$REPLY" ]; then
             pull_model
         else
             print_info "Skipping model download"
