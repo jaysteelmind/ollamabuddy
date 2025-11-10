@@ -189,15 +189,3 @@ This will:
 sudo rm /usr/local/bin/ollamabuddy
 rm -rf ~/.ollamabuddy
 
-## License
-
-[Add your license here]
-
-## Acknowledgments
-
-Built with mathematical rigor following the Universal Mathematical Development Framework v0.1.
-
----
-
-**Version**: 0.2.0 (PRD 1 Complete)  
-**Last Updated**: 2025-11-10
