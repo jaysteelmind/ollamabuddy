@@ -1,293 +1,235 @@
-//! Doctor command for system diagnostics
-//! 
-//! Provides comprehensive health checks for OllamaBuddy system.
+//! Doctor command - System health checks
 
-use crate::bootstrap::BootstrapDetector;
-use reqwest::Client;
+use crate::bootstrap::Bootstrap;
+use crate::errors::Result;
 use std::path::Path;
-use std::time::Duration;
-use sysinfo::System;
 
-/// Health check result
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum HealthStatus {
+pub enum CheckStatus {
     Pass,
-    Warn(String),
-    Fail(String),
+    Warning,
+    Fail,
 }
 
-/// Individual health check
-#[derive(Debug)]
+impl CheckStatus {
+    fn symbol(&self) -> &str {
+        match self {
+            Self::Pass => "✓",
+            Self::Warning => "⚠",
+            Self::Fail => "✗",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct HealthCheck {
     pub name: String,
-    pub status: HealthStatus,
+    pub status: CheckStatus,
+    pub message: String,
+    pub latency_ms: Option<u64>,
 }
 
-/// Doctor diagnostics system
+#[derive(Debug, Clone)]
+pub struct HealthReport {
+    pub checks: Vec<HealthCheck>,
+}
+
+impl HealthReport {
+    pub fn is_healthy(&self) -> bool {
+        !self.checks.iter().any(|c| c.status == CheckStatus::Fail)
+    }
+    
+    pub fn print(&self) {
+        println!("
+╔═══════════════════════════════════════════════════════╗");
+        println!("║ OllamaBuddy System Health Check                       ║");
+        println!("╚═══════════════════════════════════════════════════════╝
+");
+        
+        for check in &self.checks {
+            let symbol = check.status.symbol();
+            let latency = check.latency_ms
+                .map(|ms| format!(" ({}ms)", ms))
+                .unwrap_or_default();
+            
+            println!("  {} {:<20} {}{}", 
+                symbol, 
+                format!("{}:", check.name),
+                check.message,
+                latency
+            );
+        }
+        
+        println!();
+        
+        if self.is_healthy() {
+            println!("  ✓ All checks passed - System is healthy
+");
+        } else {
+            println!("  ✗ Some checks failed - Run install script or fix manually
+");
+        }
+    }
+}
+
 pub struct Doctor {
-    ollama_url: String,
-    working_dir: String,
+    bootstrap: Bootstrap,
 }
 
 impl Doctor {
-    /// Create a new doctor instance
-    pub fn new(ollama_url: String, working_dir: String) -> Self {
+    pub fn new(host: String, port: u16, model: String) -> Self {
         Self {
-            ollama_url,
-            working_dir,
+            bootstrap: Bootstrap::new(host, port, model),
         }
     }
 
-    /// Run all health checks
-    pub async fn run_diagnostics(&self) -> Vec<HealthCheck> {
+    pub async fn run_checks(&self) -> Result<HealthReport> {
         let mut checks = Vec::new();
 
         checks.push(self.check_ollama_api().await);
-        checks.push(self.check_model_available().await);
+        checks.push(self.check_model().await);
         checks.push(self.check_disk_space());
-        checks.push(self.check_memory());
+        checks.push(self.check_cwd_writable());
         checks.push(self.check_network().await);
-        checks.push(self.check_permissions());
-        checks.push(self.check_ollama_version().await);
-        checks.push(self.check_tools());
 
-        checks
+        Ok(HealthReport { checks })
     }
 
-    /// Check 1: Ollama API reachable
     async fn check_ollama_api(&self) -> HealthCheck {
-        let detector = BootstrapDetector::new(self.ollama_url.clone());
+        let start = std::time::Instant::now();
         
-        match detector.check_ollama_running().await {
-            Ok(true) => HealthCheck {
-                name: "Ollama API".to_string(),
-                status: HealthStatus::Pass,
-            },
-            Ok(false) => HealthCheck {
-                name: "Ollama API".to_string(),
-                status: HealthStatus::Fail("Ollama not running or not reachable".to_string()),
-            },
-            Err(e) => HealthCheck {
-                name: "Ollama API".to_string(),
-                status: HealthStatus::Fail(format!("Error checking Ollama: {}", e)),
-            },
-        }
-    }
-
-    /// Check 2: Model availability
-    async fn check_model_available(&self) -> HealthCheck {
-        let detector = BootstrapDetector::new(self.ollama_url.clone());
-        
-        match detector.list_models().await {
-            Ok(models) if !models.is_empty() => {
-                let _model_list = models.join(", ");
+        match self.bootstrap.check_ollama_running().await {
+            Ok(true) => {
+                let latency = start.elapsed().as_millis() as u64;
+                
                 HealthCheck {
-                    name: "Models Available".to_string(),
-                    status: HealthStatus::Pass,
+                    name: "Ollama API".to_string(),
+                    status: CheckStatus::Pass,
+                    message: "Running".to_string(),
+                    latency_ms: Some(latency),
                 }
             }
-            Ok(_) => HealthCheck {
-                name: "Models Available".to_string(),
-                status: HealthStatus::Warn("No models installed".to_string()),
-            },
-            Err(e) => HealthCheck {
-                name: "Models Available".to_string(),
-                status: HealthStatus::Fail(format!("Cannot check models: {}", e)),
-            },
+            _ => {
+                HealthCheck {
+                    name: "Ollama API".to_string(),
+                    status: CheckStatus::Fail,
+                    message: "Not reachable - Start with: ollama serve".to_string(),
+                    latency_ms: None,
+                }
+            }
         }
     }
 
-    /// Check 3: Disk space
+    async fn check_model(&self) -> HealthCheck {
+        match self.bootstrap.check_model_available(&self.bootstrap.model_tag).await {
+            Ok(true) => {
+                HealthCheck {
+                    name: "Model".to_string(),
+                    status: CheckStatus::Pass,
+                    message: "Available".to_string(),
+                    latency_ms: None,
+                }
+            }
+            Ok(false) => {
+                HealthCheck {
+                    name: "Model".to_string(),
+                    status: CheckStatus::Warning,
+                    message: "Not found - Will auto-pull on first run".to_string(),
+                    latency_ms: None,
+                }
+            }
+            Err(_) => {
+                HealthCheck {
+                    name: "Model".to_string(),
+                    status: CheckStatus::Fail,
+                    message: "Could not check".to_string(),
+                    latency_ms: None,
+                }
+            }
+        }
+    }
+
     fn check_disk_space(&self) -> HealthCheck {
         use sysinfo::Disks;
+        
         let disks = Disks::new_with_refreshed_list();
 
-        let working_path = Path::new(&self.working_dir);
-        
-        // Find disk containing working directory
-        for disk in &disks {
-            if working_path.starts_with(disk.mount_point()) {
-                let available_gb = disk.available_space() / (1024 * 1024 * 1024);
-                
-                return if available_gb < 1 {
-                    HealthCheck {
-                        name: "Disk Space".to_string(),
-                        status: HealthStatus::Fail(
-                            format!("Less than 1GB available ({} GB)", available_gb)
-                        ),
-                    }
-                } else if available_gb < 5 {
-                    HealthCheck {
-                        name: "Disk Space".to_string(),
-                        status: HealthStatus::Warn(
-                            format!("Low disk space ({} GB available)", available_gb)
-                        ),
-                    }
-                } else {
-                    HealthCheck {
-                        name: "Disk Space".to_string(),
-                        status: HealthStatus::Pass,
-                    }
-                };
-            }
-        }
-
-        HealthCheck {
-            name: "Disk Space".to_string(),
-            status: HealthStatus::Warn("Could not determine disk space".to_string()),
-        }
-    }
-
-    /// Check 4: Memory availability
-    fn check_memory(&self) -> HealthCheck {
-        let mut sys = System::new_all();
-        sys.refresh_memory();
-
-        let available_gb = sys.available_memory() / (1024 * 1024 * 1024);
-        
-        if available_gb < 1 {
-            HealthCheck {
-                name: "Memory".to_string(),
-                status: HealthStatus::Fail(
-                    format!("Less than 1GB RAM available ({} GB)", available_gb)
-                ),
-            }
-        } else if available_gb < 2 {
-            HealthCheck {
-                name: "Memory".to_string(),
-                status: HealthStatus::Warn(
-                    format!("Low memory ({} GB available)", available_gb)
-                ),
+        if let Some(disk) = disks.iter().next() {
+            let available_gb = disk.available_space() / 1_000_000_000;
+            
+            if available_gb >= 5 {
+                HealthCheck {
+                    name: "Disk Space".to_string(),
+                    status: CheckStatus::Pass,
+                    message: format!("{} GB available", available_gb),
+                    latency_ms: None,
+                }
+            } else {
+                HealthCheck {
+                    name: "Disk Space".to_string(),
+                    status: CheckStatus::Warning,
+                    message: format!("Low: {} GB (recommend 5GB+)", available_gb),
+                    latency_ms: None,
+                }
             }
         } else {
             HealthCheck {
-                name: "Memory".to_string(),
-                status: HealthStatus::Pass,
+                name: "Disk Space".to_string(),
+                status: CheckStatus::Warning,
+                message: "Could not determine".to_string(),
+                latency_ms: None,
             }
         }
     }
 
-    /// Check 5: Network connectivity
-    async fn check_network(&self) -> HealthCheck {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(5))
-            .build()
-            .unwrap_or_else(|_| Client::new());
-
-        // Try to reach a reliable endpoint
-        let test_urls = vec![
-            "https://ollama.com",
-            "https://www.google.com",
-            "https://www.cloudflare.com",
-        ];
-
-        for url in test_urls {
-            if let Ok(response) = client.get(url).send().await {
-                if response.status().is_success() {
-                    return HealthCheck {
-                        name: "Network".to_string(),
-                        status: HealthStatus::Pass,
-                    };
-                }
-            }
-        }
-
-        HealthCheck {
-            name: "Network".to_string(),
-            status: HealthStatus::Warn("Cannot reach external networks".to_string()),
-        }
-    }
-
-    /// Check 6: File permissions
-    fn check_permissions(&self) -> HealthCheck {
-        let working_path = Path::new(&self.working_dir);
+    fn check_cwd_writable(&self) -> HealthCheck {
+        let test_file = Path::new(".ollamabuddy_test");
         
-        // Test read permission
-        if !working_path.exists() {
-            return HealthCheck {
-                name: "Permissions".to_string(),
-                status: HealthStatus::Fail("Working directory does not exist".to_string()),
-            };
-        }
-
-        // Test write permission by attempting to create a temp file
-        let test_file = working_path.join(".ollamabuddy_test");
-        match std::fs::write(&test_file, "test") {
+        match std::fs::write(test_file, "test") {
             Ok(_) => {
-                let _ = std::fs::remove_file(&test_file);
+                std::fs::remove_file(test_file).ok();
                 HealthCheck {
-                    name: "Permissions".to_string(),
-                    status: HealthStatus::Pass,
+                    name: "Working Directory".to_string(),
+                    status: CheckStatus::Pass,
+                    message: "Writable".to_string(),
+                    latency_ms: None,
                 }
             }
-            Err(_) => HealthCheck {
-                name: "Permissions".to_string(),
-                status: HealthStatus::Fail("No write permission in working directory".to_string()),
-            },
+            Err(e) => {
+                HealthCheck {
+                    name: "Working Directory".to_string(),
+                    status: CheckStatus::Fail,
+                    message: format!("Not writable: {}", e),
+                    latency_ms: None,
+                }
+            }
         }
     }
 
-    /// Check 7: Ollama version
-    async fn check_ollama_version(&self) -> HealthCheck {
-        let url = format!("{}/api/version", self.ollama_url);
-        let client = Client::builder()
-            .timeout(Duration::from_secs(5))
+    async fn check_network(&self) -> HealthCheck {
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(3))
             .build()
-            .unwrap_or_else(|_| Client::new());
-
-        match client.get(&url).send().await {
-            Ok(response) if response.status().is_success() => {
+            .unwrap();
+        
+        match client.get("https://ollama.com").send().await {
+            Ok(_) => {
                 HealthCheck {
-                    name: "Ollama Version".to_string(),
-                    status: HealthStatus::Pass,
+                    name: "Network".to_string(),
+                    status: CheckStatus::Pass,
+                    message: "Online".to_string(),
+                    latency_ms: None,
                 }
             }
-            _ => HealthCheck {
-                name: "Ollama Version".to_string(),
-                status: HealthStatus::Warn("Cannot determine Ollama version".to_string()),
-            },
+            Err(_) => {
+                HealthCheck {
+                    name: "Network".to_string(),
+                    status: CheckStatus::Warning,
+                    message: "Offline (web_fetch unavailable)".to_string(),
+                    latency_ms: None,
+                }
+            }
         }
-    }
-
-    /// Check 8: Tool availability
-    fn check_tools(&self) -> HealthCheck {
-        // Check if basic system tools are available
-        let tools_available = true; // All tools are built-in Rust
-        
-        HealthCheck {
-            name: "Tools".to_string(),
-            status: if tools_available {
-                HealthStatus::Pass
-            } else {
-                HealthStatus::Warn("Some tools may not be available".to_string())
-            },
-        }
-    }
-
-    /// Display diagnostics results
-    pub fn display_results(checks: &[HealthCheck]) {
-        println!("
-🔍 OllamaBuddy System Diagnostics
-");
-        println!("{:<20} {}", "Check", "Status");
-        println!("{}", "=".repeat(50));
-
-        for check in checks {
-            let (symbol, color, message) = match &check.status {
-                HealthStatus::Pass => ("✅", "[32m", "PASS".to_string()),
-                HealthStatus::Warn(msg) => ("⚠️ ", "[33m", format!("WARN: {}", msg)),
-                HealthStatus::Fail(msg) => ("❌", "[31m", format!("FAIL: {}", msg)),
-            };
-
-            println!("{:<20} {}{} {}[0m", check.name, symbol, color, message);
-        }
-
-        println!();
-    }
-
-    /// Get overall health status
-    pub fn overall_status(checks: &[HealthCheck]) -> bool {
-        !checks.iter().any(|c| matches!(c.status, HealthStatus::Fail(_)))
     }
 }
 
@@ -296,66 +238,41 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_doctor_creation() {
-        let doctor = Doctor::new(
-            "http://localhost:11434".to_string(),
-            "/tmp".to_string(),
-        );
-        assert_eq!(doctor.ollama_url, "http://localhost:11434");
-        assert_eq!(doctor.working_dir, "/tmp");
+    fn test_check_status_symbols() {
+        assert_eq!(CheckStatus::Pass.symbol(), "✓");
+        assert_eq!(CheckStatus::Warning.symbol(), "⚠");
+        assert_eq!(CheckStatus::Fail.symbol(), "✗");
     }
 
     #[test]
-    fn test_health_status_equality() {
-        assert_eq!(HealthStatus::Pass, HealthStatus::Pass);
-        assert_eq!(
-            HealthStatus::Warn("test".to_string()),
-            HealthStatus::Warn("test".to_string())
-        );
-        assert_eq!(
-            HealthStatus::Fail("test".to_string()),
-            HealthStatus::Fail("test".to_string())
-        );
+    fn test_health_report_healthy() {
+        let report = HealthReport {
+            checks: vec![
+                HealthCheck {
+                    name: "Test".to_string(),
+                    status: CheckStatus::Pass,
+                    message: "OK".to_string(),
+                    latency_ms: None,
+                },
+            ],
+        };
+        
+        assert!(report.is_healthy());
     }
 
     #[test]
-    fn test_overall_status_pass() {
-        let checks = vec![
-            HealthCheck {
-                name: "Test 1".to_string(),
-                status: HealthStatus::Pass,
-            },
-            HealthCheck {
-                name: "Test 2".to_string(),
-                status: HealthStatus::Warn("warning".to_string()),
-            },
-        ];
-        assert!(Doctor::overall_status(&checks));
-    }
-
-    #[test]
-    fn test_overall_status_fail() {
-        let checks = vec![
-            HealthCheck {
-                name: "Test 1".to_string(),
-                status: HealthStatus::Pass,
-            },
-            HealthCheck {
-                name: "Test 2".to_string(),
-                status: HealthStatus::Fail("error".to_string()),
-            },
-        ];
-        assert!(!Doctor::overall_status(&checks));
-    }
-
-    #[tokio::test]
-    async fn test_check_tools() {
-        let doctor = Doctor::new(
-            "http://localhost:11434".to_string(),
-            "/tmp".to_string(),
-        );
-        let check = doctor.check_tools();
-        assert_eq!(check.name, "Tools");
-        assert_eq!(check.status, HealthStatus::Pass);
+    fn test_health_report_unhealthy() {
+        let report = HealthReport {
+            checks: vec![
+                HealthCheck {
+                    name: "Test".to_string(),
+                    status: CheckStatus::Fail,
+                    message: "Failed".to_string(),
+                    latency_ms: None,
+                },
+            ],
+        };
+        
+        assert!(!report.is_healthy());
     }
 }

@@ -7,10 +7,12 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-/// Bootstrap detector for Ollama and models
-pub struct BootstrapDetector {
+/// Ollama detector and bootstrap manager
+pub struct Bootstrap {
     client: Client,
     ollama_url: String,
+    
+    pub model_tag: String,
 }
 
 /// Ollama API tags response
@@ -37,9 +39,10 @@ pub enum BootstrapStatus {
     ModelNotAvailable(String),
 }
 
-impl BootstrapDetector {
+impl Bootstrap {
     /// Create a new bootstrap detector
-    pub fn new(ollama_url: String) -> Self {
+    pub fn new(host: String, port: u16, model_tag: String) -> Self {
+        let ollama_url = format!("http://{}:{}", host, port);
         let client = Client::builder()
             .timeout(Duration::from_secs(5))
             .build()
@@ -48,6 +51,7 @@ impl BootstrapDetector {
         Self {
             client,
             ollama_url,
+            model_tag,
         }
     }
 
@@ -185,4 +189,13 @@ mod tests {
 
     // Note: Integration tests for actual API calls would require
     // a running Ollama instance and are better suited for E2E tests
+    /// Check if Ollama API is running
+    pub async fn check_ollama_running(&self) -> crate::errors::Result<bool> {
+        let url = format!("{}/api/tags", self.ollama_url);
+        match self.client.get(&url).send().await {
+            Ok(response) => Ok(response.status().is_success()),
+            Err(_) => Ok(false),
+        }
+    }
+
 }

@@ -16,7 +16,6 @@ pub mod agent;
 pub mod streaming;
 pub mod context;
 pub mod tools;
-pub mod core;
 
 // Re-export commonly used types
 pub use errors::{AgentError, Result};

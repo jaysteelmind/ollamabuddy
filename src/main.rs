@@ -4,7 +4,8 @@ use anyhow::Result;
 use clap::Parser;
 use ollamabuddy::{
     cli::{Args, Commands},
-    core::{Bootstrap, Doctor},
+    bootstrap::Bootstrap,
+    doctor::Doctor,
 };
 
 #[tokio::main]

@@ -9,7 +9,6 @@
 use crate::errors::{AgentError, Result};
 use std::time::Duration;
 use tokio::time::sleep;
-use std::sync::{Arc, Mutex};
 
 /// Maximum number of retry attempts
 pub const MAX_RETRIES: u32 = 5;
