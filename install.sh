@@ -106,14 +106,14 @@ detect_platform() {
 check_dependencies() {
     print_step "Checking dependencies..."
     
-    MISSING_DEPS=()
+    MISSING_DEPS=""
     
     if ! command_exists curl; then
-        MISSING_DEPS+=("curl")
+        MISSING_DEPS="curl"
     fi
     
-    if [ "${#MISSING_DEPS[@]}" -gt 0 ]; then
-        print_error "Missing required dependencies: ${MISSING_DEPS[*]}"
+    if [ -n "$MISSING_DEPS" ]; then
+        print_error "Missing required dependencies: $MISSING_DEPS"
         print_info "Please install them and try again"
         exit 1
     fi
