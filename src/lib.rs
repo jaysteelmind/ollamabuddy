@@ -1,0 +1,20 @@
+//! OllamaBuddy v0.2 - Terminal Agent Platform
+//! 
+//! A production-ready Rust terminal agent that transforms local Ollama models
+//! into capable autonomous assistants with mathematical guarantees.
+//! 
+//! # Architecture
+//! 
+//! - **PRD 1**: Core streaming agent + context management
+//! - **PRD 2**: Tool runtime + parallel execution (not yet implemented)
+//! - **PRD 3**: Model advisor + telemetry (not yet implemented)
+
+// Module declarations for PRD 1
+pub mod errors;
+pub mod types;
+pub mod agent;
+pub mod streaming;
+pub mod context;
+
+// Re-export commonly used types
+pub use errors::{AgentError, Result};
