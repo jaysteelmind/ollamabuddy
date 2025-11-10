@@ -2,6 +2,7 @@
 
 use anyhow::Result;
 use clap::Parser;
+use indicatif::{ProgressBar, ProgressStyle};
 use ollamabuddy::{
     cli::{Args, Commands, Verbosity},
     bootstrap::Bootstrap,
@@ -9,6 +10,7 @@ use ollamabuddy::{
     agent::AgentOrchestrator,
     agent::orchestrator::AgentConfig,
     tools::ToolRuntime,
+    telemetry::{TelemetryCollector, TelemetryEvent, TelemetryDisplay},
 };
 
 #[tokio::main]
@@ -87,6 +89,10 @@ Start Ollama with: ollama serve");
     let mut orchestrator = AgentOrchestrator::new(config)?;
     let tool_runtime = ToolRuntime::new(&working_dir)?;
     
+    // Initialize telemetry
+    let telemetry = TelemetryCollector::new();
+    let display = TelemetryDisplay::new(telemetry.clone(), args.verbosity());
+    
     // 3. Set up agent with task
     orchestrator.add_user_goal(task.to_string());
     
@@ -99,6 +105,11 @@ Start Ollama with: ollama serve");
     // 4. Start state machine
     use ollamabuddy::agent::StateEvent;
     orchestrator.transition(StateEvent::StartSession)?;
+    telemetry.record(TelemetryEvent::StateTransition {
+        from: "Init".to_string(),
+        to: "Planning".to_string(),
+        timestamp: std::time::Instant::now(),
+    });
     
     // 5. Main agent loop
     let max_iterations = 10;
@@ -113,7 +124,17 @@ Start Ollama with: ollama serve");
 \n=== Iteration {} ===", iteration);
         
         // Check context and compress if needed
+        let tokens_before = orchestrator.token_count();
         orchestrator.maybe_compress()?;
+        let tokens_after = orchestrator.token_count();
+        if tokens_before != tokens_after {
+            telemetry.record(TelemetryEvent::ContextCompression {
+                before_tokens: tokens_before,
+                after_tokens: tokens_after,
+                timestamp: std::time::Instant::now(),
+            });
+            println!("🗜️  Compressed context: {} → {} tokens", tokens_before, tokens_after);
+        }
         
         // Build prompt
         let prompt = orchestrator.build_prompt();
@@ -126,9 +147,17 @@ Start Ollama with: ollama serve");
         let client = orchestrator.client();
         let mut stream = client.generate_stream(prompt).await?;
         
-        println!("🤔 Model thinking...");
+        let thinking_pb = ProgressBar::new_spinner();
+        thinking_pb.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.cyan} {msg}")
+                .unwrap()
+        );
+        thinking_pb.set_message("Model thinking...");
+        thinking_pb.enable_steady_tick(std::time::Duration::from_millis(100));
         
         let mut response_text = String::new();
+        let mut token_count = 0;
         
         use futures_util::StreamExt;
         while let Some(chunk_result) = stream.next().await {
@@ -145,15 +174,39 @@ Start Ollama with: ollama serve");
                         AgentMsg::ToolCall { tool, args } => {
                             println!("🔧 Tool call: {} with args: {:?}", tool, args);
                             
+                            let tool_start = std::time::Instant::now();
+                            telemetry.record(TelemetryEvent::ToolStarted {
+                                tool: tool.clone(),
+                                timestamp: tool_start,
+                            });
+                            
                             // Transition to executing
                             orchestrator.transition(StateEvent::ToolCall)?;
                             
+                            // Show progress bar for tool execution
+                            let pb = ProgressBar::new_spinner();
+                            pb.set_style(
+                                ProgressStyle::default_spinner()
+                                    .template("{spinner:.green} {msg}")
+                                    .unwrap()
+                            );
+                            pb.set_message(format!("Executing: {}", tool));
+                            pb.enable_steady_tick(std::time::Duration::from_millis(100));
+                            
                             // Execute tool
                             let result = tool_runtime.execute(&tool, &serde_json::to_value(&args)?).await;
+                            pb.finish_and_clear();
                             
                             match result {
                                 Ok(tool_output) => {
-                                    println!("✅ Tool result: {}", tool_output.output);
+                                    let duration = tool_start.elapsed().as_millis() as u64;
+                                    telemetry.record(TelemetryEvent::ToolCompleted {
+                                        tool: tool.clone(),
+                                        duration_ms: duration,
+                                        success: true,
+                                        timestamp: std::time::Instant::now(),
+                                    });
+                                    println!("✅ Tool result ({}ms): {}", duration, tool_output.output);
                                     
                                     // Add tool result to memory
                                     use ollamabuddy::types::MemoryEntry;
@@ -228,8 +281,10 @@ Start Ollama with: ollama serve");
             }
         }
         
+        thinking_pb.finish_and_clear();
+        
         if !response_text.is_empty() && matches!(args.verbosity(), Verbosity::Verbose | Verbosity::VeryVerbose) {
-            println!("\n");
+            println!();
         }
     }
     
@@ -238,6 +293,10 @@ Start Ollama with: ollama serve");
     }
     
     println!("\n🏁 Agent finished");
+    
+    // Display telemetry summary
+    println!();
+    display.display_summary();
     
     Ok(())
 }
