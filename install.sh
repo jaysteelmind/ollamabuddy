@@ -258,9 +258,9 @@ build_from_source() {
         git clone https://github.com/${GITHUB_REPO}.git ollamabuddy
     else
         print_info "git not found, downloading as archive..."
-        curl -fsSL "https://github.com/${GITHUB_REPO}/archive/refs/heads/main.tar.gz" -o ollamabuddy.tar.gz
+        curl -fsSL "https://github.com/${GITHUB_REPO}/archive/refs/heads/master.tar.gz" -o ollamabuddy.tar.gz
         tar -xzf ollamabuddy.tar.gz
-        mv ollamabuddy-main ollamabuddy
+        mv ollamabuddy-master ollamabuddy
     fi
     
     cd ollamabuddy
