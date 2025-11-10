@@ -3,7 +3,7 @@ set -e
 
 #############################################################
 # OllamaBuddy All-in-One Installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/jaysteelmind/ollamabuddy/main/install.sh | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/jaysteelmind/ollamabuddy/master/install.sh | sh
 #
 # This script will:
 # 1. Detect your OS and architecture
