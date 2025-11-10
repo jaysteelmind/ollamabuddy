@@ -446,14 +446,21 @@ main() {
     
     if ! check_model; then
         echo ""
+    # Auto-download model when running via pipe
+    if [ -t 0 ]; then
         printf "Download default model ${DEFAULT_MODEL} (3.8GB)? [Y/n] "
-        read REPLY
-        if [ "$REPLY" = "Y" ] || [ "$REPLY" = "y" ] || [ -z "$REPLY" ]; then
-            pull_model
-        else
-            print_info "Skipping model download"
-            print_info "Download later with: ollama pull ${DEFAULT_MODEL}"
-        fi
+        read -r REPLY
+    else
+        # Running via pipe, auto-download
+        echo "Auto-downloading model ${DEFAULT_MODEL} (running via pipe)..."
+        REPLY="Y"
+    fi
+    if [ "$REPLY" = "Y" ] || [ "$REPLY" = "y" ] || [ -z "$REPLY" ]; then
+        pull_model
+    else
+        print_info "Skipping model download"
+        print_info "Download later with: ollama pull ${DEFAULT_MODEL}"
+    fi
     fi
     
     setup_config
