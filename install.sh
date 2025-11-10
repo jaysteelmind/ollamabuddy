@@ -441,6 +441,7 @@ main() {
     fi
     ensure_ollama_running
     
+    # Build from source (no releases yet)
     build_from_source
     
     if ! check_model; then
