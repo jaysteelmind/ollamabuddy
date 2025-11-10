@@ -24,7 +24,6 @@ anyhow = "1.0"
 uuid = { version = "1.6", features = ["v4"] }
 futures-util = "0.3"
 
-
 # Async traits (PRD 2)
 async-trait = "0.1"
 
@@ -32,6 +31,19 @@ async-trait = "0.1"
 bytes = "1.5"
 rand = "0.8"
 num_cpus = "1.16"
+
+# PRD 3: CLI & Terminal UI
+clap = { version = "4.4", features = ["derive", "cargo"] }
+crossterm = "0.27"
+indicatif = "0.17"
+
+# PRD 3: System Info & Configuration
+sysinfo = "0.30"
+dirs = "5.0"
+toml = "0.8"
+
+# PRD 3: Time utilities
+chrono = "0.4"
 
 [dev-dependencies]
 # Testing

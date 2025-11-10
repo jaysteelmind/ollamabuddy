@@ -19,3 +19,10 @@ pub mod tools;
 
 // Re-export commonly used types
 pub use errors::{AgentError, Result};
+
+// PRD 3: Intelligence & Interface Layer
+pub mod advisor;
+pub mod telemetry;
+pub mod bootstrap;
+pub mod doctor;
+pub mod cli;
