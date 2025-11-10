@@ -1,131 +1,138 @@
-//! OllamaBuddy v0.2 - Main Entry Point
-//! 
-//! This is a stub demonstrating the PRD 3 architecture.
-//! Full integration of all components will be completed in subsequent phases.
+//! OllamaBuddy v0.2 - Main CLI Entry Point
 
+use anyhow::Result;
 use clap::Parser;
 use ollamabuddy::{
-    cli::{Args, Commands, Verbosity},
-    bootstrap::{BootstrapDetector, BootstrapStatus, EXIT_CODE_SETUP_NEEDED},
-    doctor::Doctor,
-    advisor::ModelAdvisor,
-    telemetry::TelemetryCollector,
+    cli::{Args, Commands},
+    core::{Bootstrap, Doctor},
 };
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Parse command-line arguments
+async fn main() -> Result<()> {
     let args = Args::parse();
 
-    // Validate arguments
-    if let Err(e) = args.validate() {
-        eprintln!("Error: {}", e);
-        eprintln!("\nUsage: ollamabuddy <TASK> [OPTIONS]");
-        eprintln!("   or: ollamabuddy <COMMAND>");
-        eprintln!("\nRun 'ollamabuddy --help' for more information.");
-        std::process::exit(1);
+    match &args.command {
+        Some(Commands::Doctor) => {
+            run_doctor(&args).await?;
+        }
+        Some(Commands::Models) => {
+            list_models(&args).await?;
+        }
+        Some(Commands::Clean { logs }) => {
+            clean_state(&args, *logs).await?;
+        }
+        Some(Commands::Config) => {
+            show_config(&args)?;
+        }
+        None => {
+            println!("OllamaBuddy v0.2.0");
+            println!("
+PRD 1 & 2 Complete - Full agent coming in v0.2.1");
+            println!("
+Available commands:");
+            println!("  doctor  - Run system health checks");
+            println!("  models  - List available Ollama models");
+            println!("  config  - Show current configuration");
+            println!("  clean   - Clear state and logs");
+            println!("
+For help: ollamabuddy --help");
+        }
     }
 
-    // Handle subcommands
-    if let Some(ref command) = args.command {
-        return handle_subcommand(command, &args).await;
-    }
-
-    // Main agent execution path (stub)
-    println!("🤖 OllamaBuddy v0.2");
-    println!("Task: {}", args.task.as_ref().unwrap());
-    println!("Model: {}", args.model);
-    println!("Verbosity: {:?}", args.verbosity());
-    println!("\n⚠️  Full agent integration coming in next phase.");
-    println!("✅ PRD 3 architecture complete:");
-    println!("   - Configuration system");
-    println!("   - CLI argument parsing");
-    println!("   - Bootstrap detection");
-    println!("   - Doctor diagnostics");
-    println!("   - Model advisor");
-    println!("   - Telemetry system");
-    
     Ok(())
 }
 
-/// Handle subcommands
-async fn handle_subcommand<'a>(
-    command: &Commands,
-    args: &Args,
-) -> Result<(), Box<dyn std::error::Error>> {
-    match command {
-        Commands::Doctor => {
-            println!("🔍 Running system diagnostics...\n");
-            let doctor = Doctor::new(
-                args.ollama_url(),
-                args.working_dir().to_string_lossy().to_string(),
-            );
-            let checks = doctor.run_diagnostics().await;
-            Doctor::display_results(&checks);
-            
-            if !Doctor::overall_status(&checks) {
-                std::process::exit(1);
-            }
-        }
-        
-        Commands::Models => {
-            println!("📦 Listing available models...\n");
-            let detector = BootstrapDetector::new(args.ollama_url());
-            
-            match detector.check_ollama_running().await {
-                Ok(true) => {
-                    match detector.list_models().await {
-                        Ok(models) => {
-                            if models.is_empty() {
-                                println!("No models installed.");
-                                println!("\nTo install a model:");
-                                println!("  ollama pull qwen2.5:7b-instruct");
-                            } else {
-                                println!("Available models:");
-                                for model in models {
-                                    println!("  • {}", model);
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            eprintln!("Error listing models: {}", e);
-                            std::process::exit(1);
-                        }
-                    }
-                }
-                Ok(false) => {
-                    BootstrapDetector::show_ollama_install_instructions();
-                    std::process::exit(EXIT_CODE_SETUP_NEEDED);
-                }
-                Err(e) => {
-                    eprintln!("Error checking Ollama: {}", e);
-                    std::process::exit(1);
+async fn run_doctor(args: &Args) -> Result<()> {
+    let doctor = Doctor::new(
+        args.host.clone(),
+        args.port,
+        args.model.clone(),
+    );
+
+    let report = doctor.run_checks().await?;
+    report.print();
+
+    std::process::exit(if report.is_healthy() { 0 } else { 1 });
+}
+
+async fn list_models(args: &Args) -> Result<()> {
+    let bootstrap = Bootstrap::new(
+        args.host.clone(),
+        args.port,
+        args.model.clone(),
+    );
+
+    println!("
+Checking Ollama models...
+");
+
+    match bootstrap.list_models().await {
+        Ok(models) => {
+            if models.is_empty() {
+                println!("No models installed.");
+                println!("
+Pull a model with:");
+                println!("  ollama pull qwen2.5:7b-instruct");
+            } else {
+                println!("Available models:");
+                for model in models {
+                    println!("  • {}", model);
                 }
             }
+            println!();
         }
-        
-        Commands::Clean { logs } => {
-            println!("🧹 Cleaning OllamaBuddy state...");
-            if *logs {
-                println!("   - Removing logs");
-            }
-            println!("   - Removing temporary files");
-            println!("\n✅ Cleanup complete");
-        }
-        
-        Commands::Config => {
-            println!("⚙️  Current configuration:");
-            println!("\nOllama:");
-            println!("  Host: {}", args.host);
-            println!("  Port: {}", args.port);
-            println!("  Model: {}", args.model);
-            println!("\nSettings:");
-            println!("  Working directory: {}", args.working_dir().display());
-            println!("  Online mode: {}", args.online);
-            println!("  Auto-upgrade: {}", args.auto_upgrade);
-            println!("  Verbosity: {:?}", args.verbosity());
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            eprintln!("
+Is Ollama running? Start with: ollama serve");
+            std::process::exit(1);
         }
     }
-    
+
+    Ok(())
+}
+
+async fn clean_state(_args: &Args, _logs: bool) -> Result<()> {
+    use tokio::fs;
+
+    let state_dir = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".ollamabuddy");
+
+    if state_dir.exists() {
+        fs::remove_dir_all(&state_dir).await?;
+        println!("✓ Cleaned state directory: {:?}", state_dir);
+    } else {
+        println!("No state directory found.");
+    }
+
+    Ok(())
+}
+
+fn show_config(args: &Args) -> Result<()> {
+    println!("
+╔═══════════════════════════════════════════════════════╗");
+    println!("║ OllamaBuddy Configuration                             ║");
+    println!("╚═══════════════════════════════════════════════════════╝
+");
+
+    println!("Ollama:");
+    println!("  Host:  {}", args.host);
+    println!("  Port:  {}", args.port);
+    println!("  Model: {}", args.model);
+    println!();
+
+    if let Some(cwd) = &args.cwd {
+        println!("Working Directory:");
+        println!("  {:?}", cwd);
+        println!();
+    }
+
+    println!("Features:");
+    println!("  Online mode:    {}", if args.online { "enabled" } else { "disabled" });
+    println!("  Auto-upgrade:   {}", if args.auto_upgrade { "enabled" } else { "disabled" });
+    println!("  Verbosity:      {:?}", args.verbosity());
+    println!();
+
     Ok(())
 }
