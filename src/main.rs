@@ -96,11 +96,148 @@ Start Ollama with: ollama serve");
     println!("🔧 Available Tools: {}", tool_runtime.tool_names().join(", "));
     println!();
     
-    // 4. Main agent loop (simplified for now)
-    println!("⚙️  Agent execution loop not yet implemented");
-    println!("✅ Components initialized successfully!");
-    println!("
-Next: Implement streaming loop + tool execution");
+    // 4. Start state machine
+    use ollamabuddy::agent::StateEvent;
+    orchestrator.transition(StateEvent::StartSession)?;
+    
+    // 5. Main agent loop
+    let max_iterations = 10;
+    let mut iteration = 0;
+    
+    while iteration < max_iterations && !matches!(
+        orchestrator.state(), 
+        ollamabuddy::agent::AgentState::Final | ollamabuddy::agent::AgentState::Error
+    ) {
+        iteration += 1;
+        println!("
+\n=== Iteration {} ===", iteration);
+        
+        // Check context and compress if needed
+        orchestrator.maybe_compress()?;
+        
+        // Build prompt
+        let prompt = orchestrator.build_prompt();
+        
+        if matches!(args.verbosity(), Verbosity::Verbose | Verbosity::VeryVerbose) {
+            println!("📝 Prompt ({} tokens)", orchestrator.token_count());
+        }
+        
+        // Stream response from Ollama
+        let client = orchestrator.client();
+        let mut stream = client.generate_stream(prompt).await?;
+        
+        println!("🤔 Model thinking...");
+        
+        let mut response_text = String::new();
+        
+        use futures_util::StreamExt;
+        while let Some(chunk_result) = stream.next().await {
+            let chunk_bytes = chunk_result?;
+            
+            // Parse streaming JSON
+            let parser = orchestrator.parser_mut();
+            if let Some(json_str) = parser.add_bytes(&chunk_bytes)? {
+                // Try to parse as agent message
+                if let Ok(agent_msg) = parser.parse_agent_msg(&json_str) {
+                    use ollamabuddy::types::AgentMsg;
+                    
+                    match agent_msg {
+                        AgentMsg::ToolCall { tool, args } => {
+                            println!("🔧 Tool call: {} with args: {:?}", tool, args);
+                            
+                            // Transition to executing
+                            orchestrator.transition(StateEvent::ToolCall)?;
+                            
+                            // Execute tool
+                            let result = tool_runtime.execute(&tool, &serde_json::to_value(&args)?).await;
+                            
+                            match result {
+                                Ok(tool_output) => {
+                                    println!("✅ Tool result: {}", tool_output.output);
+                                    
+                                    // Add tool result to memory
+                                    use ollamabuddy::types::MemoryEntry;
+                                    orchestrator.memory_mut().add(MemoryEntry::ToolCall {
+                                        tool: tool.clone(),
+                                        args: args.clone(),
+                                        timestamp: std::time::SystemTime::now()
+                                            .duration_since(std::time::UNIX_EPOCH)
+                                            .unwrap()
+                                            .as_secs(),
+                                    });
+                                    
+                                    orchestrator.memory_mut().add(MemoryEntry::ToolResult {
+                                        tool: tool.clone(),
+                                        output: tool_output.output.clone(),
+                                        success: true,
+                                        duration_ms: tool_output.duration_ms,
+                                        timestamp: std::time::SystemTime::now()
+                                            .duration_since(std::time::UNIX_EPOCH)
+                                            .unwrap()
+                                            .as_secs(),
+                                    });
+                                    
+                                    // Transition to planning for next iteration
+                                    orchestrator.transition(StateEvent::ToolComplete)?;
+                                }
+                                Err(e) => {
+                                    eprintln!("❌ Tool execution failed: {}", e);
+                                    orchestrator.transition(StateEvent::ToolFailure)?;
+                                }
+                            }
+                        }
+                        AgentMsg::Final { result, summary } => {
+                            println!("\n✅ Task Complete!");
+                            println!("{}", result);
+                            if let Some(sum) = summary {
+                                println!("Summary: {}", sum);
+                            }
+                            orchestrator.transition(StateEvent::GoalAchieved)?;
+                            break;
+                        }
+                        AgentMsg::Plan { steps, reasoning } => {
+                            println!("📋 Plan created:");
+                            for (i, step) in steps.iter().enumerate() {
+                                println!("   {}. {}", i + 1, step);
+                            }
+                            if let Some(reason) = reasoning {
+                                println!("💭 Reasoning: {}", reason);
+                            }
+                            orchestrator.transition(StateEvent::PlanComplete)?;
+                        }
+                        AgentMsg::Ask { question } => {
+                            println!("❓ Model asks: {}", question);
+                            // For now, just continue
+                        }
+                        AgentMsg::Error { message, recoverable } => {
+                            eprintln!("❌ Model error: {}", message);
+                            if recoverable {
+                                println!("⚠️  Error is recoverable, continuing...");
+                            } else {
+                                orchestrator.transition(StateEvent::UnrecoverableError)?;
+                            }
+                        }
+                    }
+                } else {
+                    // Plain text response
+                    response_text.push_str(&json_str);
+                    if matches!(args.verbosity(), Verbosity::Verbose | Verbosity::VeryVerbose) {
+                        print!("{}", json_str);
+                    }
+                }
+            }
+        }
+        
+        if !response_text.is_empty() && matches!(args.verbosity(), Verbosity::Verbose | Verbosity::VeryVerbose) {
+            println!("\n");
+        }
+    }
+    
+    if iteration >= max_iterations {
+        println!("\n⚠️  Maximum iterations reached");
+    }
+    
+    println!("\n🏁 Agent finished");
     
     Ok(())
 }
