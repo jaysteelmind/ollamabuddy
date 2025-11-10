@@ -303,13 +303,19 @@ install_binary() {
 #############################################################
 
 check_model() {
-    print_step "Checking for default model (${DEFAULT_MODEL})..."
+    print_step "Checking for models..."
     
-    if ollama list 2>/dev/null | grep -q "$DEFAULT_MODEL"; then
+    # Check if any qwen2.5 model exists
+    if ollama list 2>/dev/null | grep -q "qwen2.5"; then
+        EXISTING_MODEL=$(ollama list 2>/dev/null | grep "qwen2.5" | head -1 | awk '{print $1}')
+        print_success "Found existing model: ${EXISTING_MODEL}"
+        print_info "Will use ${EXISTING_MODEL} as default"
+        return 0
+    elif ollama list 2>/dev/null | grep -q "$DEFAULT_MODEL"; then
         print_success "Model ${DEFAULT_MODEL} is already installed"
         return 0
     else
-        print_warning "Model ${DEFAULT_MODEL} is not installed"
+        print_warning "No qwen2.5 models installed"
         return 1
     fi
 }
