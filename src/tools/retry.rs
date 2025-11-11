@@ -162,7 +162,7 @@ impl RetryManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
     #[tokio::test]
     async fn test_retry_success_first_attempt() {
