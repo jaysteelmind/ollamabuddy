@@ -90,27 +90,17 @@ Start Ollama with: ollama serve");
     let tool_runtime = ToolRuntime::new(&working_dir)?;
     
     // Set system prompt with tool instructions
-    let system_prompt = format!(
-        "You are an autonomous AI agent that helps users complete tasks by using available tools.
+    let tools_list = tool_runtime.tool_names().join(", ");
+    let system_prompt = format!("You are an autonomous AI agent that helps users complete tasks by using available tools.
 
-CRITICAL INSTRUCTIONS:
-- You MUST respond ONLY with valid JSON
-- Use tools by outputting JSON in this exact format: {{"type": "tool_call", "tool": "tool_name", "args": {{"key": "value"}}}}
-- When task is complete, output: {{"type": "final", "result": "description of what was accomplished"}}
-- NEVER output plain text explanations or commands
-- NEVER use markdown code blocks
+CRITICAL: You MUST respond ONLY with valid JSON in one of these formats:
+
+Tool call: {{\"type\": \"tool_call\", \"tool\": \"tool_name\", \"args\": {{\"key\": \"value\"}}}}
+Completion: {{\"type\": \"final\", \"result\": \"description\"}}
 
 Available tools: {}
 
-Example tool call:
-{{"type": "tool_call", "tool": "list_dir", "args": {{"path": "src"}}}}
-
-Example completion:
-{{"type": "final", "result": "Found 29 .rs files in src directory"}}
-
-Remember: OUTPUT ONLY JSON, NO OTHER TEXT.",
-        tool_runtime.tool_names().join(", ")
-    );
+NEVER output plain text. NEVER use markdown. ONLY JSON.", tools_list);
     
     orchestrator.add_system_prompt(system_prompt);
     
