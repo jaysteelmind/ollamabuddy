@@ -89,6 +89,31 @@ Start Ollama with: ollama serve");
     let mut orchestrator = AgentOrchestrator::new(config)?;
     let tool_runtime = ToolRuntime::new(&working_dir)?;
     
+    // Set system prompt with tool instructions
+    let system_prompt = format!(
+        "You are an autonomous AI agent that helps users complete tasks by using available tools.
+
+CRITICAL INSTRUCTIONS:
+- You MUST respond ONLY with valid JSON
+- Use tools by outputting JSON in this exact format: {{"type": "tool_call", "tool": "tool_name", "args": {{...}}}}
+- When task is complete, output: {{"type": "final", "result": "description of what was accomplished"}}
+- NEVER output plain text explanations or commands
+- NEVER use markdown code blocks
+
+Available tools: {}
+
+Example tool call:
+{{"type": "tool_call", "tool": "list_dir", "args": {{"path": "src"}}}}
+
+Example completion:
+{{"type": "final", "result": "Found 29 .rs files in src directory"}}
+
+Remember: OUTPUT ONLY JSON, NO OTHER TEXT.",
+        tool_runtime.tool_names().join(", ")
+    );
+    
+    orchestrator.add_system_prompt(system_prompt);
+    
     // Initialize telemetry
     let telemetry = TelemetryCollector::new();
     let display = TelemetryDisplay::new(telemetry.clone(), args.verbosity());
