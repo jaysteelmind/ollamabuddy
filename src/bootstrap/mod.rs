@@ -189,13 +189,4 @@ mod tests {
 
     // Note: Integration tests for actual API calls would require
     // a running Ollama instance and are better suited for E2E tests
-    /// Check if Ollama API is running
-    pub async fn check_ollama_running(&self) -> crate::errors::Result<bool> {
-        let url = format!("{}/api/tags", self.ollama_url);
-        match self.client.get(&url).send().await {
-            Ok(response) => Ok(response.status().is_success()),
-            Err(_) => Ok(false),
-        }
-    }
-
 }
