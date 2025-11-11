@@ -165,7 +165,7 @@ mod tests {
 
     #[test]
     fn test_detector_creation() {
-        let detector = BootstrapDetector::new("http://localhost:11434".to_string());
+        let detector = Bootstrap::new("localhost".to_string(), 11434, "qwen2.5:7b".to_string());
         assert_eq!(detector.ollama_url, "http://localhost:11434");
     }
 
