@@ -175,7 +175,7 @@ This project follows **Top 2% Engineering Standards** (Level 10):
 
 To remove OllamaBuddy:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jaysteelmind/ollamabuddy/main/uninstall.sh | sh
+curl -fsSL https://raw.githubusercontent.com/jaysteelmind/ollamabuddy/master/uninstall.sh | sh
 ```
 
 This will:
