@@ -66,6 +66,22 @@ pub struct AgentOrchestrator {
     
     /// Advanced planning system (PRD 5)
     planner: Option<AdvancedPlanner>,
+    
+    /// PRD 6: Memory & Learning System
+    /// Episodic memory for experience tracking
+    episodic_memory: crate::memory::EpisodicMemory,
+    
+    /// Knowledge graph for semantic understanding
+    knowledge_graph: std::sync::Arc<std::sync::RwLock<crate::memory::KnowledgeGraph>>,
+    
+    /// Pattern matcher for similar problem detection
+    pattern_matcher: std::sync::Arc<std::sync::RwLock<crate::memory::PatternMatcher>>,
+    
+    /// Experience tracker for learning
+    experience_tracker: std::sync::Arc<std::sync::RwLock<crate::memory::ExperienceTracker>>,
+    
+    /// Working memory for active context
+    working_memory: crate::memory::WorkingMemory,
 }
 
 impl AgentOrchestrator {
@@ -73,6 +89,19 @@ impl AgentOrchestrator {
     pub fn new(config: AgentConfig) -> Result<Self> {
         let client = OllamaClient::with_config(&config.ollama_url, &config.model)?;
         
+        
+        // Initialize memory system (PRD 6)
+        let episodic_memory = crate::memory::EpisodicMemory::new();
+        let knowledge_graph = std::sync::Arc::new(std::sync::RwLock::new(
+            crate::memory::KnowledgeGraph::new()
+        ));
+        let pattern_matcher = std::sync::Arc::new(std::sync::RwLock::new(
+            crate::memory::PatternMatcher::new(5)
+        ));
+        let experience_tracker = std::sync::Arc::new(std::sync::RwLock::new(
+            crate::memory::ExperienceTracker::new()
+        ));
+        let working_memory = crate::memory::WorkingMemory::new();
         Ok(Self {
             state: AgentState::Init,
             memory: MemoryManager::new(),
@@ -81,6 +110,11 @@ impl AgentOrchestrator {
             parser: JsonParser::new(),
             config,
             iterations: 0,
+            episodic_memory,
+            knowledge_graph,
+            pattern_matcher,
+            experience_tracker,
+            working_memory,
             planner: None,
         })
     }
