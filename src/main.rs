@@ -171,18 +171,46 @@ NEVER output plain text. NEVER use markdown. ONLY JSON.", tools_list);
         thinking_pb.set_message("Model thinking...");
         thinking_pb.enable_steady_tick(std::time::Duration::from_millis(100));
         
-        let mut response_text = String::new();
+        let mut response_text_accumulator = String::new();
         let mut token_count = 0;
         
         use futures_util::StreamExt;
         while let Some(chunk_result) = stream.next().await {
             let chunk_bytes = chunk_result?;
             
-            // Parse streaming JSON
-            let parser = orchestrator.parser_mut();
-            if let Some(json_str) = parser.add_bytes(&chunk_bytes)? {
-                // Try to parse as agent message
-                if let Ok(agent_msg) = parser.parse_agent_msg(&json_str) {
+            // Extract "response" field from Ollama API format
+            if let Ok(ollama_response) = serde_json::from_slice::<serde_json::Value>(&chunk_bytes) {
+                if let Some(token) = ollama_response.get("response").and_then(|r| r.as_str()) {
+                    response_text_accumulator.push_str(token);
+                    token_count += 1;
+                    
+                    // Report token to telemetry
+                    telemetry.record(TelemetryEvent::TokenReceived {
+                        token: token.to_string(),
+                        timestamp: std::time::Instant::now(),
+                    });
+                    
+                    if matches!(args.verbosity(), Verbosity::VeryVerbose) {
+                        print!("{}", token);
+                        use std::io::Write;
+                        std::io::stdout().flush().ok();
+                    }
+                }
+            }
+        }
+        
+        thinking_pb.finish_and_clear();
+        
+        // Parse accumulated response as AgentMsg
+        if !response_text_accumulator.is_empty() {
+            let trimmed = response_text_accumulator.trim();
+            
+            if matches!(args.verbosity(), Verbosity::VeryVerbose) {
+                eprintln!("\n[DEBUG] Parsing: {}", trimmed);
+            }
+            
+            match serde_json::from_str::<ollamabuddy::types::AgentMsg>(trimmed) {
+                Ok(agent_msg) => {
                     use ollamabuddy::types::AgentMsg;
                     
                     match agent_msg {
@@ -286,20 +314,14 @@ NEVER output plain text. NEVER use markdown. ONLY JSON.", tools_list);
                             }
                         }
                     }
-                } else {
-                    // Plain text response
-                    response_text.push_str(&json_str);
+                }
+                Err(e) => {
                     if matches!(args.verbosity(), Verbosity::Verbose | Verbosity::VeryVerbose) {
-                        print!("{}", json_str);
+                        eprintln!("\n⚠️  Parse failed: {}", e);
+                        eprintln!("   Text: {}", trimmed);
                     }
                 }
             }
-        }
-        
-        thinking_pb.finish_and_clear();
-        
-        if !response_text.is_empty() && matches!(args.verbosity(), Verbosity::Verbose | Verbosity::VeryVerbose) {
-            println!();
         }
     }
     
@@ -410,3 +432,5 @@ fn show_config(args: &Args) -> Result<()> {
 
     Ok(())
 }
+
+

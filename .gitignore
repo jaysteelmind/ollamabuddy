@@ -1,1 +1,7 @@
 /target
+
+# Investigation artifacts
+test_*.log
+build_check.log
+src/main.rs.backup
+INVESTIGATION_FINDINGS.md
