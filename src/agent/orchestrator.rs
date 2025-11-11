@@ -243,6 +243,40 @@ impl AgentOrchestrator {
     pub fn parser_mut(&mut self) -> &mut JsonParser {
         &mut self.parser
     }
+
+    /// Initialize advanced planning for a goal
+    ///
+    /// PRD 5: Hierarchical decomposition, complexity estimation, strategy generation
+    pub fn initialize_planning(&mut self, goal: &str) -> Result<()> {
+        let mut planner = AdvancedPlanner::new();
+        planner.initialize(goal, &[])?;
+        self.planner = Some(planner);
+        Ok(())
+    }
+    
+    /// Get reference to the planner
+    pub fn planner(&self) -> Option<&AdvancedPlanner> {
+        self.planner.as_ref()
+    }
+    
+    /// Get mutable reference to the planner
+    pub fn planner_mut(&mut self) -> Option<&mut AdvancedPlanner> {
+        self.planner.as_mut()
+    }
+    
+    /// Get current planning progress
+    pub fn planning_progress(&self) -> Option<f64> {
+        self.planner.as_ref()
+            .and_then(|p| p.get_progress())
+            .map(|pt| pt.get_metrics().overall_progress)
+    }
+    
+    /// Reset planning for new task
+    pub fn reset_planning(&mut self) {
+        if let Some(planner) = &mut self.planner {
+            planner.reset();
+        }
+    }
 }
 
 #[cfg(test)]
