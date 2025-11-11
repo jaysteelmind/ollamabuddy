@@ -273,8 +273,11 @@ NEVER output plain text. NEVER use markdown. ONLY JSON.", tools_list);
                                             .as_secs(),
                                     });
                                     
-                                    // Transition to planning for next iteration
+                                    // Transition: Executing -> Verifying
                                     orchestrator.transition(StateEvent::ToolComplete)?;
+                                    
+                                    // Immediately transition: Verifying -> Planning for next iteration
+                                    orchestrator.transition(StateEvent::ContinueIteration)?;
                                 }
                                 Err(e) => {
                                     eprintln!("❌ Tool execution failed: {}", e);
@@ -432,5 +435,6 @@ fn show_config(args: &Args) -> Result<()> {
 
     Ok(())
 }
+
 
 
