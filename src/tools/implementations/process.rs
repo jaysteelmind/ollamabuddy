@@ -34,9 +34,36 @@ pub async fn run_command(
         ));
     }
 
-    // Create command without shell (security: prevents injection)
-    let mut cmd = Command::new(command);
-    cmd.args(args);
+    // Create command - use shell if command contains shell operators
+    let needs_shell = command.contains('|') || 
+                     command.contains('>') || 
+                     command.contains('<') ||
+                     command.contains('&') ||
+                     command.contains(';');
+    
+    let mut cmd = if needs_shell {
+        // Use shell for complex commands (pipes, redirects, etc.)
+        // Security note: User is responsible for command safety
+        #[cfg(unix)]
+        {
+            let mut c = Command::new("sh");
+            c.arg("-c");
+            c.arg(command);
+            c
+        }
+        #[cfg(windows)]
+        {
+            let mut c = Command::new("cmd");
+            c.arg("/C");
+            c.arg(command);
+            c
+        }
+    } else {
+        // Direct execution for simple commands (safer)
+        let mut c = Command::new(command);
+        c.args(args);
+        c
+    };
 
     // Execute with timeout
     let timeout_duration = Duration::from_secs(timeout_seconds);
@@ -372,3 +399,4 @@ mod tests {
         assert!(!result.success);
     }
 }
+
