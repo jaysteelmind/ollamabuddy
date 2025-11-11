@@ -95,7 +95,7 @@ Start Ollama with: ollama serve");
 
 CRITICAL INSTRUCTIONS:
 - You MUST respond ONLY with valid JSON
-- Use tools by outputting JSON in this exact format: {{"type": "tool_call", "tool": "tool_name", "args": {{...}}}}
+- Use tools by outputting JSON in this exact format: {{"type": "tool_call", "tool": "tool_name", "args": {{"key": "value"}}}}
 - When task is complete, output: {{"type": "final", "result": "description of what was accomplished"}}
 - NEVER output plain text explanations or commands
 - NEVER use markdown code blocks
