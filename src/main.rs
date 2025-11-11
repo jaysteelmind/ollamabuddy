@@ -90,17 +90,61 @@ Start Ollama with: ollama serve");
     let tool_runtime = ToolRuntime::new(&working_dir)?;
     
     // Set system prompt with tool instructions
-    let tools_list = tool_runtime.tool_names().join(", ");
-    let system_prompt = format!("You are an autonomous AI agent that helps users complete tasks by using available tools.
+    // Build detailed tool descriptions for better model understanding
+    let tool_descriptions = vec![
+        "list_dir: List files and directories. Args: path (string, required), recursive (bool, optional, default false)",
+        "read_file: Read contents of a text file. Args: path (string, required)",
+        "write_file: Write or append content to a file. Args: path (string, required), content (string, required), append (bool, optional, default false)",
+        "run_command: Execute a system command (supports shell pipes/redirects). Args: command (string, required), args (array of strings, optional), timeout_seconds (number, optional, default 60)",
+        "system_info: Get system information. Args: info_type (string, optional: 'os', 'cpu', 'memory', 'disk', 'all', default 'all')",
+        "web_fetch: Fetch content from a URL. Args: url (string, required), method (string, optional: 'GET' or 'POST', default 'GET'), timeout_seconds (number, optional, default 30)",
+    ];
+    
+    let tools_formatted = tool_descriptions.join("\n  ");
+    
+    let system_prompt = format!(r#"You are an autonomous AI agent that helps users complete tasks using available tools.
 
-CRITICAL: You MUST respond ONLY with valid JSON in one of these formats:
+RESPONSE FORMAT - You MUST respond with valid JSON only:
 
-Tool call: {{\"type\": \"tool_call\", \"tool\": \"tool_name\", \"args\": {{\"key\": \"value\"}}}}
-Completion: {{\"type\": \"final\", \"result\": \"description\"}}
+Tool call format:
+{{\"type\": \"tool_call\", \"tool\": \"tool_name\", \"args\": {{\"key\": \"value\"}}}}
 
-Available tools: {}
+Completion format:
+{{\"type\": \"final\", \"result\": \"description of what was accomplished\"}}
 
-NEVER output plain text. NEVER use markdown. ONLY JSON.", tools_list);
+AVAILABLE TOOLS:
+  {}
+
+TOOL SELECTION GUIDELINES:
+- list_dir: Use to explore directories and find files
+- read_file: Use to read file contents (text files only)
+- write_file: Use to create or modify files
+- run_command: Use for system commands, file operations, shell pipes (find, grep, wc, etc.)
+- system_info: Use to check OS, CPU, memory, disk space
+- web_fetch: Use to download web content
+
+CRITICAL RULES:
+1. Output ONLY valid JSON (no plain text, no markdown, no explanations)
+2. Use exact tool names from the list above
+3. Provide all required arguments as specified
+4. For shell commands with pipes/redirects, use run_command with full command string
+5. After tool execution, you'll receive the result and can call another tool or complete the task
+
+EXAMPLES:
+
+List directory:
+{{\"type\": \"tool_call\", \"tool\": \"list_dir\", \"args\": {{\"path\": \"src\"}}}}
+
+Count files with shell command:
+{{\"type\": \"tool_call\", \"tool\": \"run_command\", \"args\": {{\"command\": \"find src -name '*.rs' | wc -l\"}}}}
+
+Read a file:
+{{\"type\": \"tool_call\", \"tool\": \"read_file\", \"args\": {{\"path\": \"README.md\"}}}}
+
+Task complete:
+{{\"type\": \"final\", \"result\": \"Found 32 .rs files in src directory\"}}
+
+Now begin!"#, tools_formatted);
     
     orchestrator.add_system_prompt(system_prompt);
     
@@ -205,11 +249,18 @@ NEVER output plain text. NEVER use markdown. ONLY JSON.", tools_list);
         if !response_text_accumulator.is_empty() {
             let trimmed = response_text_accumulator.trim();
             
+            // Unescape JSON if model outputs escaped quotes
+            // Model may output: {\"type\": \"tool_call\"}
+            // We need: {"type": "tool_call"}
+            let unescaped = trimmed
+                .replace(r#"\""#, r#"""#)  // Replace backslash-quote with quote
+                .to_string();
+            
             if matches!(args.verbosity(), Verbosity::VeryVerbose) {
-                eprintln!("\n[DEBUG] Parsing: {}", trimmed);
+                eprintln!("\n[DEBUG] Parsing: {}", unescaped);
             }
             
-            match serde_json::from_str::<ollamabuddy::types::AgentMsg>(trimmed) {
+            match serde_json::from_str::<ollamabuddy::types::AgentMsg>(&unescaped) {
                 Ok(agent_msg) => {
                     use ollamabuddy::types::AgentMsg;
                     
@@ -321,7 +372,7 @@ NEVER output plain text. NEVER use markdown. ONLY JSON.", tools_list);
                 Err(e) => {
                     if matches!(args.verbosity(), Verbosity::Verbose | Verbosity::VeryVerbose) {
                         eprintln!("\n⚠️  Parse failed: {}", e);
-                        eprintln!("   Text: {}", trimmed);
+                        eprintln!("   Text: {}", unescaped);
                     }
                 }
             }
@@ -435,6 +486,9 @@ fn show_config(args: &Args) -> Result<()> {
 
     Ok(())
 }
+
+
+
 
 
 
