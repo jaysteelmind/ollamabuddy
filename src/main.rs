@@ -89,6 +89,18 @@ Start Ollama with: ollama serve");
     let mut orchestrator = AgentOrchestrator::new(config)?;
     let tool_runtime = ToolRuntime::new(&working_dir)?;
     
+    // Initialize advanced planning system (PRD 5)
+    if matches!(args.verbosity(), Verbosity::Verbose | Verbosity::VeryVerbose) {
+        println!("🧠 Initializing advanced planning system...");
+    }
+    orchestrator.initialize_planning(task)?;
+    
+    if matches!(args.verbosity(), Verbosity::Verbose | Verbosity::VeryVerbose) {
+        if let Some(progress) = orchestrator.planning_progress() {
+            println!("📊 Initial planning complete. Progress: {:.1}%", progress * 100.0);
+        }
+    }
+    
     // Set system prompt with tool instructions
     // Build detailed tool descriptions for better model understanding
     let tool_descriptions = vec![
