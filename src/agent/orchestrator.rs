@@ -12,6 +12,7 @@ use crate::context::ContextCompressor;
 use crate::errors::Result;
 use crate::streaming::{OllamaClient, JsonParser};
 use crate::types::MemoryEntry;
+use crate::planning::AdvancedPlanner;
 
 /// Agent orchestrator configuration
 #[derive(Debug, Clone)]
@@ -62,6 +63,9 @@ pub struct AgentOrchestrator {
     
     /// Iteration counter
     iterations: usize,
+    
+    /// Advanced planning system (PRD 5)
+    planner: Option<AdvancedPlanner>,
 }
 
 impl AgentOrchestrator {
@@ -77,6 +81,7 @@ impl AgentOrchestrator {
             parser: JsonParser::new(),
             config,
             iterations: 0,
+            planner: None,
         })
     }
 
