@@ -27,3 +27,4 @@ pub mod bootstrap;
 pub mod doctor;
 pub mod cli;
 pub mod planning;
+pub mod memory;

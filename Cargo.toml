@@ -21,7 +21,7 @@ thiserror = "1.0"
 anyhow = "1.0"
 
 # Utilities
-uuid = { version = "1.6", features = ["v4"] }
+uuid = { version = "1.6", features = ["v4", "serde"] }
 futures-util = "0.3"
 
 # Async traits (PRD 2)
