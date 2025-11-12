@@ -167,6 +167,9 @@ Now begin!"#, tools_formatted);
     // 3. Set up agent with task
     orchestrator.add_user_goal(task.to_string());
     
+    // PRD 7: Initialize working memory with goal
+    orchestrator.set_goal(task.to_string());
+    
     println!("🤖 OllamaBuddy Agent Starting...");
     println!("📋 Task: {}", task);
     println!("📁 Working Directory: {:?}", working_dir);
@@ -181,6 +184,30 @@ Now begin!"#, tools_formatted);
         to: "Planning".to_string(),
         timestamp: std::time::Instant::now(),
     });
+    
+    // PRD 7: Query memory before planning
+    let verbose = matches!(args.verbosity(), Verbosity::Verbose | Verbosity::VeryVerbose);
+    if verbose {
+        eprintln!("[MEMORY] Checking for similar past episodes...");
+    }
+    let similar_patterns = orchestrator.find_similar_patterns(task, 0.7);
+    if !similar_patterns.is_empty() && verbose {
+        eprintln!("[MEMORY] Found {} similar episodes", similar_patterns.len());
+    }
+    
+    // Get tool recommendations from experience
+    let available_tools = vec![
+        "list_dir".to_string(),
+        "read_file".to_string(),
+        "write_file".to_string(),
+        "run_command".to_string(),
+        "system_info".to_string(),
+        "web_fetch".to_string(),
+    ];
+    let tool_recommendations = orchestrator.get_tool_recommendations(task, &available_tools);
+    if !tool_recommendations.is_empty() && verbose {
+        eprintln!("[MEMORY] Got {} tool recommendations from experience", tool_recommendations.len());
+    }
     
     // 5. Main agent loop
     let max_iterations = 10;
@@ -401,7 +428,24 @@ Now begin!"#, tools_formatted);
     println!();
     display.display_summary();
     
-    Ok(())
+    
+    // PRD 7: Record episode at session end
+    let session_success = !matches!(
+        orchestrator.state(),
+        ollamabuddy::agent::AgentState::Error
+    );
+    
+    orchestrator.record_episode(
+        task.to_string(),
+        session_success,
+        if session_success { None } else { Some("Task incomplete or failed".to_string()) }
+    );
+    
+    if verbose {
+        eprintln!("[MEMORY] Session episode recorded");
+    }
+    
+        Ok(())
 }
 
 async fn run_doctor(args: &Args) -> Result<()> {
