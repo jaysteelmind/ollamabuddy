@@ -1,6 +1,6 @@
 [package]
 name = "ollamabuddy"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 authors = ["Jerome (Kubashen) Naidoo"]
 description = "Turn any local Ollama model into a capable terminal agent"
