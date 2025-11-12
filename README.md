@@ -92,7 +92,7 @@ cargo test --lib
 
 ## Project Status
 
-### ✅ Completed (PRD 1)
+###  Completed (PRD 1)
 
 - Core streaming agent architecture
 - State machine with formal verification
@@ -101,7 +101,7 @@ cargo test --lib
 - Token counting (±10% accuracy)
 - Memory manager with bounded storage
 
-### 🚧 In Progress
+###  In Progress
 
 - **PRD 2**: Tool runtime + parallel execution + security
 - **PRD 3**: Model advisor + telemetry + bootstrap/doctor
@@ -110,11 +110,11 @@ cargo test --lib
 
 | Metric | Target | Status |
 |--------|--------|--------|
-| First token latency | P99 < 200ms | ✅ Implemented |
-| Token throughput | ≥ 15 tok/s | ✅ Implemented |
-| Context compression | 6K→4K tokens | ✅ Verified |
-| Memory overhead | < 100 entries | ✅ Bounded |
-| Test coverage | 100% (algorithms) | ✅ Achieved |
+| First token latency | P99 < 200ms |  Implemented |
+| Token throughput | ≥ 15 tok/s |  Implemented |
+| Context compression | 6K→4K tokens |  Verified |
+| Memory overhead | < 100 entries |  Bounded |
+| Test coverage | 100% (algorithms) |  Achieved |
 
 ## Mathematical Guarantees
 
@@ -146,11 +146,11 @@ cargo test --lib
 
 ### Code Quality Standards
 
-- ✅ Zero unsafe code blocks
-- ✅ All clippy warnings addressed
-- ✅ 97%+ test pass rate
-- ✅ Documentation coverage ≥90%
-- ✅ Formal verification tests
+-  Zero unsafe code blocks
+-  All clippy warnings addressed
+-  97%+ test pass rate
+-  Documentation coverage ≥90%
+-  Formal verification tests
 
 ### Module Structure
 ```
