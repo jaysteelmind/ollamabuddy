@@ -15,6 +15,7 @@ pub mod types;
 pub mod budget;
 pub mod validation;
 pub mod analysis;
+pub mod recovery;
 pub mod agent;
 pub mod streaming;
 pub mod context;
