@@ -1,0 +1,383 @@
+warning: unused import: `ValidatorConfig`
+ --> src/validation/orchestrator.rs:5:51
+  |
+5 | use crate::validation::validator::{TaskValidator, ValidatorConfig};
+  |                                                   ^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `GoalNode`
+ --> src/planning/hierarchical.rs:6:40
+  |
+6 | use crate::planning::types::{GoalTree, GoalNode, NodeType, NodeId};
+  |                                        ^^^^^^^^
+
+warning: unused import: `GoalNode`
+ --> src/planning/complexity.rs:8:30
+  |
+8 | use crate::planning::types::{GoalNode, GoalTree};
+  |                              ^^^^^^^^
+
+warning: unused import: `GoalStatus`
+ --> src/planning/progress.rs:6:57
+  |
+6 | use crate::planning::types::{ProgressMetrics, GoalTree, GoalStatus};
+  |                                                         ^^^^^^^^^^
+
+warning: unused import: `EpisodeMetadata`
+   --> src/memory/episodic.rs:220:46
+    |
+220 |     use crate::memory::types::{ActionRecord, EpisodeMetadata, EpisodeOutcome};
+    |                                              ^^^^^^^^^^^^^^^
+
+warning: field `k` is never read
+   --> src/memory/patterns.rs:104:5
+    |
+102 | pub struct PatternMatcher {
+    |            -------------- field in this struct
+103 |     /// Number of hash functions
+104 |     k: usize,
+    |     ^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: comparison is useless due to type limits
+   --> src/validation/validator.rs:570:17
+    |
+570 |         assert!(validation.total_time_ms >= 0, "Should track execution time");
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_comparisons)]` on by default
+
+warning: `ollamabuddy` (lib test) generated 7 warnings (run `cargo fix --lib -p ollamabuddy --tests` to apply 5 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
+     Running unittests src/lib.rs (target/debug/deps/ollamabuddy-e9fb9c4b23c74eec)
+
+running 324 tests
+test advisor::tests::test_calculate_complexity_low ... ok
+test advisor::tests::test_custom_cost_sensitivity ... ok
+test advisor::tests::test_advisor_creation ... ok
+test advisor::tests::test_calculate_complexity_high ... ok
+test advisor::tests::test_model_tier_next ... ok
+test advisor::tests::test_model_tier_from_tag ... ok
+test advisor::tests::test_custom_upgrade_threshold ... ok
+test advisor::tests::test_get_model_spec ... ok
+test advisor::tests::test_no_upgrade_for_simple_task ... ok
+test advisor::tests::test_trigger_conditions ... ok
+test agent::memory::tests::test_bounded_capacity ... ok
+test advisor::tests::test_upgrade_for_complex_task ... ok
+test agent::memory::tests::test_clear ... ok
+test agent::memory::tests::test_fifo_eviction ... ok
+test agent::memory::tests::test_last_n ... ok
+test agent::memory::tests::test_last_tool_call ... ok
+test agent::memory::tests::test_replace_all ... ok
+test agent::memory::tests::test_replace_all_overflow ... ok
+test agent::memory::tests::test_system_prompt_retrieval ... ok
+test agent::memory::tests::test_total_tokens ... ok
+test agent::state::tests::test_determinism ... ok
+test agent::state::tests::test_invalid_transitions ... ok
+test agent::state::tests::test_panic_from_any_state ... ok
+test agent::state::tests::test_terminal_states ... ok
+test agent::state::tests::test_valid_events ... ok
+test agent::state::tests::test_valid_transitions ... ok
+test analysis::convergence::tests::test_bounded_history ... ok
+test analysis::convergence::tests::test_convergence_prediction ... ok
+test analysis::convergence::tests::test_detector_creation ... ok
+test analysis::convergence::tests::test_record_progress ... ok
+test analysis::convergence::tests::test_reset ... ok
+test analysis::convergence::tests::test_stagnation_detection_active ... ok
+test analysis::convergence::tests::test_stagnation_detection_insufficient_data ... ok
+test analysis::convergence::tests::test_stagnation_detection_stagnant ... ok
+test analysis::convergence::tests::test_termination_budget_exhausted ... ok
+test analysis::convergence::tests::test_termination_none ... ok
+test analysis::convergence::tests::test_termination_success ... ok
+test analysis::convergence::tests::test_velocity_calculation ... ok
+test bootstrap::tests::test_bootstrap_status_equality ... ok
+test bootstrap::tests::test_exit_code_constant ... ok
+test budget::manager::tests::test_budget_bounded ... ok
+test budget::manager::tests::test_budget_calculation_complex_task ... ok
+test budget::manager::tests::test_budget_calculation_medium_task ... ok
+test budget::manager::tests::test_budget_calculation_simple_task ... ok
+test budget::manager::tests::test_budget_exhaustion ... ok
+test budget::manager::tests::test_budget_monotonicity ... ok
+test budget::manager::tests::test_complexity_clamping ... ok
+test budget::manager::tests::test_custom_config ... ok
+test budget::manager::tests::test_exhausted_warning ... ok
+test budget::manager::tests::test_exhaustion_warning ... ok
+test budget::manager::tests::test_iteration_tracking ... ok
+test budget::manager::tests::test_remaining_iterations ... ok
+test budget::manager::tests::test_reset ... ok
+test budget::manager::tests::test_runtime_adjustment ... ok
+test budget::manager::tests::test_utilization_calculation ... ok
+test cli::args::tests::test_ollama_url ... ok
+test cli::args::tests::test_validate_fail_both_task_and_command ... ok
+test cli::args::tests::test_validate_fail_no_task_or_command ... ok
+test cli::args::tests::test_validate_success_with_subcommand ... ok
+test cli::args::tests::test_validate_success_with_task ... ok
+test cli::args::tests::test_verbosity_methods ... ok
+test cli::args::tests::test_verbosity_normal ... ok
+test cli::args::tests::test_verbosity_quiet ... ok
+test cli::args::tests::test_verbosity_verbose ... ok
+test cli::args::tests::test_verbosity_very_verbose ... ok
+test cli::config::tests::test_config_validation_cost_sensitivity ... ok
+test cli::config::tests::test_config_validation_success ... ok
+test cli::config::tests::test_config_validation_verbosity ... ok
+test cli::config::tests::test_config_validation_zero_tokens ... ok
+test cli::config::tests::test_config_validation_threshold ... ok
+test cli::config::tests::test_default_config ... ok
+test cli::config::tests::test_ollama_url ... ok
+test cli::config::tests::test_expand_path_without_tilde ... ok
+test cli::config::tests::test_expand_path_with_tilde ... ok
+test context::compressor::tests::test_chronological_order_maintained ... ok
+test context::compressor::tests::test_empty_input ... ok
+test context::compressor::tests::test_needs_compression ... ok
+test context::compressor::tests::test_preserves_system_prompt ... ok
+test context::compressor::tests::test_compression_stats ... ok
+test context::compressor::tests::test_compression_guarantee ... ok
+test context::compressor::tests::test_preserves_user_goal ... ok
+test context::counter::tests::test_single_character ... ok
+test context::counter::tests::test_upper_bound ... ok
+test doctor::tests::test_health_report_healthy ... ok
+test errors::tests::test_invalid_transition_error ... ok
+test memory::episodic::tests::test_episodic_memory_creation ... ok
+test memory::episodic::tests::test_clear ... ok
+test memory::episodic::tests::test_find_by_hash ... ok
+test context::counter::tests::test_detailed_estimate ... ok
+test memory::episodic::tests::test_find_similar_episodes ... ok
+test memory::episodic::tests::test_jaccard_similarity ... ok
+test memory::episodic::tests::test_get_recent ... ok
+test memory::episodic::tests::test_keyword_extraction ... ok
+test context::counter::tests::test_linear_scaling ... ok
+test memory::knowledge::tests::test_concept_extraction ... ok
+test memory::knowledge::tests::test_get_files ... ok
+test memory::knowledge::tests::test_is_camel_case ... ok
+test memory::knowledge::tests::test_knowledge_graph_creation ... ok
+test memory::patterns::tests::test_feature_vector_extraction ... ok
+test memory::episodic::tests::test_similarity_hash_computation ... ok
+test doctor::tests::test_health_report_unhealthy ... ok
+test context::counter::tests::test_unicode_characters ... ok
+test memory::patterns::tests::test_clear ... ok
+test context::counter::tests::test_batch_estimation ... ok
+test context::compressor::tests::test_preserves_last_3_entries ... ok
+test memory::experience::tests::test_bayesian_success_rate ... ok
+test errors::tests::test_error_display ... ok
+test context::counter::tests::test_consistent_margin ... ok
+test memory::episodic::tests::test_add_and_retrieve_episode ... ok
+test context::counter::tests::test_basic_estimation ... ok
+test memory::experience::tests::test_confidence_increases_with_samples ... ok
+test context::counter::tests::test_empty_string ... ok
+test memory::knowledge::tests::test_add_edge ... ok
+test memory::knowledge::tests::test_add_node ... ok
+test doctor::tests::test_check_status_symbols ... ok
+test context::compressor::tests::test_tool_output_compression ... ok
+test context::counter::tests::test_mixed_content ... ok
+test memory::patterns::tests::test_jaccard_similarity ... ok
+test context::counter::tests::test_upper_bound_always_greater ... ok
+test memory::patterns::tests::test_pattern_matcher_creation ... ok
+test planning::complexity::tests::test_ambiguity_estimation ... ok
+test memory::patterns::tests::test_index_episode ... ok
+test planning::complexity::tests::test_complexity_classification ... ok
+test memory::patterns::tests::test_minhash_signature ... ok
+test planning::complexity::tests::test_estimator_creation ... ok
+test planning::complexity::tests::test_recommended_iterations ... ok
+test planning::complexity::tests::test_complex_goal_complexity ... ok
+test planning::complexity::tests::test_tool_count_estimation ... ok
+test memory::knowledge::tests::test_find_node ... ok
+test planning::complexity::tests::test_simple_goal_complexity ... ok
+test memory::patterns::tests::test_no_matches_below_threshold ... ok
+test planning::hierarchical::tests::test_sequential_decomposition ... ok
+test planning::complexity::tests::test_complexity_bounds ... ok
+test planning::hierarchical::tests::test_depth_limit_respected ... ok
+test planning::progress::tests::test_duplicate_updates_ignored ... ok
+test planning::hierarchical::tests::test_simple_goal_no_decomposition ... ok
+test memory::patterns::tests::test_find_similar_episodes ... ok
+test planning::progress::tests::test_goal_completion_updates_progress ... ok
+test planning::hierarchical::tests::test_fanout_limit_respected ... ok
+test planning::hierarchical::tests::test_leaf_nodes_are_atomic ... ok
+test planning::progress::tests::test_milestone_updates_progress ... ok
+test planning::progress::tests::test_progress_is_monotonic ... ok
+test planning::progress::tests::test_progress_bounded ... ok
+test planning::hierarchical::tests::test_planner_creation ... ok
+test planning::progress::tests::test_tool_execution_updates_progress ... ok
+test planning::replanner::tests::test_replanner_creation ... ok
+test planning::replanner::tests::test_empty_results_detection ... ok
+test planning::progress::tests::test_stagnant_detection ... ok
+test planning::progress::tests::test_tracker_creation ... ok
+test planning::replanner::tests::test_error_streak_detection ... ok
+test planning::strategies::tests::test_generator_creation ... ok
+test planning::strategies::tests::test_exploratory_strategy_ambiguous_goal ... ok
+test planning::strategies::tests::test_generate_strategies ... ok
+test planning::replanner::tests::test_repeated_calls_detection ... ok
+test planning::replanner::tests::test_stagnant_progress_detection ... ok
+test planning::strategies::tests::test_systematic_strategy_complex_goal ... ok
+test planning::progress::tests::test_progress_summary ... ok
+test planning::replanner::tests::test_replan_action_switch_strategy ... ok
+test planning::replanner::tests::test_reset_clears_history ... ok
+test planning::strategies::tests::test_direct_strategy_simple_goal ... ok
+test planning::types::tests::test_goal_tree_creation ... ok
+test planning::types::tests::test_progress_metrics_calculation ... ok
+test planning::strategies::tests::test_select_best_strategy ... ok
+test recovery::adaptive::test_recovery_action_priority ... ok
+test memory::episodic::tests::test_bounded_capacity ... ok
+test recovery::adaptive::tests::test_aggressive_recovery_config ... ok
+test planning::strategies::tests::test_utility_calculation ... ok
+test recovery::adaptive::tests::test_failure_symptom_severity ... ok
+test recovery::adaptive::tests::test_parallelism_reduction ... ok
+test recovery::adaptive::tests::test_bounded_history ... ok
+test recovery::adaptive::tests::test_pattern_frequency_tracking ... ok
+test planning::strategies::tests::test_tool_inference ... ok
+test planning::types::tests::test_add_child_node ... ok
+test planning::hierarchical::tests::test_complex_goal_decomposition ... ok
+test recovery::adaptive::tests::test_recovery_action_stagnation ... ok
+test recovery::adaptive::tests::test_recovery_action_tool_failure ... ok
+test recovery::adaptive::tests::test_detect_pattern ... ok
+test planning::types::tests::test_fanout_constraint ... ok
+test recovery::adaptive::tests::test_strategy_attempts_tracking ... ok
+test planning::types::tests::test_depth_constraint ... ok
+test streaming::parser::tests::test_buffer_overflow ... ok
+test recovery::adaptive::tests::test_recovery_action_timeout ... ok
+test streaming::parser::tests::test_force_parse ... ok
+test streaming::parser::tests::test_mismatched_braces ... ok
+test streaming::parser::tests::test_multiple_json_objects ... ok
+test streaming::parser::tests::test_nested_braces ... ok
+test streaming::parser::tests::test_simple_json_extraction ... ok
+test streaming::parser::tests::test_parse_agent_msg_tool_call ... ok
+test recovery::adaptive::tests::test_recovery_strategy_next ... ok
+test recovery::adaptive::tests::test_recovery_creation ... ok
+test telemetry::tests::test_compression_event ... ok
+test telemetry::tests::test_collector_creation ... ok
+test telemetry::tests::test_record_tool_events ... ok
+test recovery::adaptive::tests::test_should_abort ... ok
+test recovery::adaptive::tests::test_strategy_rotation ... ok
+test recovery::adaptive::tests::test_recovery_action_budget_exhaustion ... ok
+test streaming::parser::tests::test_clear ... ok
+test streaming::parser::tests::test_escaped_quotes ... ok
+test recovery::adaptive::tests::test_recovery_action_validation_failure ... ok
+test streaming::parser::tests::test_incremental_json_extraction ... ok
+test tools::executor::tests::test_executor_creation ... ok
+test tools::implementations::process::tests::test_run_command_empty ... ok
+test tools::implementations::filesystem::tests::test_list_dir_nonexistent ... ok
+test telemetry::tests::test_recent_events ... ok
+test telemetry::tests::test_record_token_event ... ok
+test recovery::adaptive::tests::test_reset ... ok
+test tools::implementations::process::tests::test_web_fetch_invalid_method ... ok
+test telemetry::tests::test_tool_success_rate ... ok
+test tools::implementations::filesystem::tests::test_list_dir_empty ... ok
+test streaming::parser::tests::test_braces_in_strings ... ok
+test tools::implementations::filesystem::tests::test_path_jail_security ... ok
+test streaming::parser::tests::test_parse_agent_msg_plan ... ok
+test tools::registry::tests::test_all_tools_registered ... ok
+test tools::executor::tests::test_read_only_classification ... ok
+test tools::registry::tests::test_get_tool_schema ... ok
+test tools::executor::tests::test_semaphore_limiting ... ok
+test tools::executor::tests::test_parallel_execution ... ok
+test tools::registry::tests::test_nonexistent_tool ... ok
+test tools::registry::tests::test_schemas ... ok
+test tools::retry::tests::test_calculate_delay ... ok
+test tools::registry::tests::test_read_only_tools ... ok
+test tools::registry::tests::test_tool_names ... ok
+test tools::retry::tests::test_delay_cap ... ok
+test telemetry::tests::test_elapsed_time ... ok
+test tools::retry::tests::test_max_total_wait_time ... ok
+test tools::retry::tests::test_is_retryable ... ok
+test tools::executor::tests::test_execute_list_dir ... ok
+test tools::implementations::process::tests::test_system_info_os ... ok
+test tools::registry::tests::test_registry_creation ... ok
+test tools::registry::tests::test_tool_schema_structure ... ok
+test tools::registry::tests::test_write_tools ... ok
+test tools::security::tests::test_jail_creation_nonexistent ... ok
+test tools::types::tests::test_tool_context_default ... ok
+test tools::security::tests::test_nonexistent_file_in_jail ... ok
+test tools::types::tests::test_tool_result_with_exit_code ... ok
+test tools::types::tests::test_tool_schema_creation ... ok
+test tools::types::tests::test_tool_stats_tracking ... ok
+test types::messages::tests::test_memory_entry_timestamp ... ok
+test types::messages::tests::test_agent_msg_serialization ... ok
+test types::messages::tests::test_memory_entry_token_estimation ... ok
+test validation::orchestrator::tests::test_max_attempts_enforcement ... ok
+test tools::implementations::process::tests::test_run_command_success ... ok
+test tools::types::tests::test_tool_context_builder ... ok
+test tools::security::tests::test_is_within_jail ... ok
+test tools::types::tests::test_tool_result_failure ... ok
+test tools::runtime::tests::test_tool_classification ... ok
+test validation::orchestrator::tests::test_orchestrator_reset ... ok
+test validation::orchestrator::tests::test_recovery_history_tracking ... ok
+test tools::security::tests::test_verify_path_within_jail ... ok
+test validation::orchestrator::tests::test_recovery_plan_generation ... ok
+test tools::types::tests::test_tool_result_success ... ok
+test validation::orchestrator::tests::test_report_generation ... ok
+test validation::orchestrator::tests::test_successful_validation_first_attempt ... ok
+test validation::orchestrator::tests::test_validation_with_recovery ... ok
+test tools::security::tests::test_verify_absolute_path_within_jail ... ok
+test tools::implementations::process::tests::test_run_command_with_args ... ok
+test tools::security::tests::test_reject_absolute_path_outside_jail ... ok
+test validation::orchestrator::tests::test_orchestrator_creation ... ok
+test validation::validator::tests::test_content_quality_fail_short ... ok
+test validation::validator::tests::test_check_weights_sum ... ok
+test tools::runtime::tests::test_runtime_creation ... ok
+test tools::security::tests::test_property_paths_in_jail_verify ... ok
+test validation::validator::tests::test_content_quality_pass ... ok
+test validation::validator::tests::test_custom_validator_config ... ok
+test validation::validator::tests::test_failed_checks_extraction ... ok
+test validation::validator::tests::test_failure_reasons_extraction ... ok
+test validation::validator::tests::test_content_quality_fail_placeholder ... ok
+test validation::validator::tests::test_format_correctness_pass ... ok
+test validation::validator::tests::test_multiple_checks_all_enabled ... ok
+test validation::validator::tests::test_format_correctness_fail_empty ... ok
+test validation::validator::tests::test_outcome_existence_fail ... ok
+test validation::validator::tests::test_outcome_existence_pass ... ok
+test validation::validator::tests::test_validation_attempt_tracking ... ok
+test validation::validator::tests::test_format_correctness_fail_error_indicator ... ok
+test validation::validator::tests::test_validation_score_calculation ... ok
+test validation::validator::tests::test_validation_state_failed ... ok
+test validation::validator::tests::test_validation_state_validated ... ok
+test validation::validator::tests::test_validation_threshold ... ok
+test validation::validator::tests::test_validation_timing ... ok
+test validation::validator::tests::test_validator_creation ... ok
+test tools::security::tests::test_reject_parent_directory_escape ... ok
+test tools::security::tests::test_jail_creation ... ok
+test tools::implementations::process::tests::test_web_fetch_invalid_url ... ok
+test tools::retry::tests::test_non_retryable_error ... ok
+test tools::runtime::tests::test_registry_access ... ok
+test tools::retry::tests::test_retry_success_first_attempt ... ok
+test tools::implementations::process::tests::test_system_info_invalid_type ... ok
+test tools::security::tests::test_security_multiple_escape_attempts ... ok
+test tools::implementations::filesystem::tests::test_list_dir_with_files ... ok
+test tools::security::tests::test_nested_directories ... ok
+test tools::implementations::filesystem::tests::test_read_file_nonexistent ... ok
+test tools::implementations::process::tests::test_system_info_cpu ... ok
+test tools::implementations::process::tests::test_system_info_all ... ok
+test tools::implementations::filesystem::tests::test_write_file_success ... ok
+test tools::executor::tests::test_execute_system_info ... ok
+test tools::implementations::filesystem::tests::test_read_file_success ... ok
+test tools::security::tests::test_jail_root_access ... ok
+test tools::runtime::tests::test_has_tool ... ok
+test tools::implementations::process::tests::test_run_command_nonzero_exit ... ok
+test tools::implementations::filesystem::tests::test_list_dir_recursive ... ok
+test tools::implementations::filesystem::tests::test_read_file_too_large ... ok
+test tools::runtime::tests::test_execute_system_info ... ok
+test tools::executor::tests::test_execute_unknown_tool ... ok
+test tools::runtime::tests::test_execute_read_file ... ok
+test tools::implementations::filesystem::tests::test_write_file_too_large ... ok
+test tools::runtime::tests::test_parallel_execution_multiple_reads ... ok
+test tools::runtime::tests::test_execute_list_dir ... ok
+test tools::implementations::filesystem::tests::test_write_file_creates_parent_dirs ... ok
+test tools::runtime::tests::test_execute_run_command ... ok
+test tools::runtime::tests::test_execute_write_file ... ok
+test tools::retry::tests::test_retry_max_attempts_exceeded ... ok
+test agent::orchestrator::tests::test_add_user_goal ... ok
+test agent::orchestrator::tests::test_add_system_prompt ... ok
+test bootstrap::tests::test_detector_creation ... ok
+test agent::orchestrator::tests::test_token_counting ... ok
+test agent::orchestrator::tests::test_orchestrator_creation ... ok
+test agent::orchestrator::tests::test_build_prompt ... ok
+test agent::orchestrator::tests::test_state_transition ... ok
+test streaming::client::tests::test_client_with_config ... ok
+test streaming::client::tests::test_client_creation ... ok
+test agent::orchestrator::tests::test_iteration_tracking ... ok
+test tools::implementations::process::tests::test_run_command_timeout ... ok
+test tools::retry::tests::test_retry_success_after_failures ... ok
+test tools::runtime::tests::test_security_path_jail ... ok
+
+test result: ok. 324 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.23s
+

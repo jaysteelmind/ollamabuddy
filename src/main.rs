@@ -3,6 +3,7 @@
 use anyhow::Result;
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
+use ollamabuddy::budget::DynamicBudgetManager;
 use ollamabuddy::{
     cli::{Args, Commands, Verbosity},
     bootstrap::Bootstrap,
@@ -210,7 +211,28 @@ Now begin!"#, tools_formatted);
     }
     
     // 5. Main agent loop
-    let max_iterations = 10;
+    // PRD 8: Initialize dynamic budget manager
+    let mut budget_manager = DynamicBudgetManager::new();
+    
+    // Estimate initial complexity (simple heuristic based on task length and keywords)
+    let task_complexity = {
+        let base_complexity = (task.len() as f64 / 200.0).min(0.5);
+        let keyword_boost = if task.to_lowercase().contains("analyze") ||
+                                task.to_lowercase().contains("complex") ||
+                                task.to_lowercase().contains("multiple") {
+            0.3
+        } else {
+            0.0
+        };
+        (base_complexity + keyword_boost).min(1.0)
+    };
+    
+    // Calculate dynamic budget based on complexity
+    let max_iterations = budget_manager.calculate_budget(task_complexity);
+    
+    if verbose {
+        eprintln!("[BUDGET] Task complexity: {:.2}, Allocated iterations: {}", task_complexity, max_iterations);
+    }
     let mut iteration = 0;
     
     while iteration < max_iterations && !matches!(
