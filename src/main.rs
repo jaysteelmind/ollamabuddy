@@ -4,6 +4,7 @@ use anyhow::Result;
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use ollamabuddy::budget::DynamicBudgetManager;
+use ollamabuddy::validation::ValidationOrchestrator;
 use ollamabuddy::{
     cli::{Args, Commands, Verbosity},
     bootstrap::Bootstrap,
@@ -214,6 +215,10 @@ Now begin!"#, tools_formatted);
     // PRD 8: Initialize dynamic budget manager
     let mut budget_manager = DynamicBudgetManager::new();
     
+    // PRD 9: Initialize validation system
+    let mut validation_orchestrator = ValidationOrchestrator::new();
+    let mut tool_results_log: Vec<ollamabuddy::tools::types::ToolResult> = Vec::new();
+    
     // Estimate initial complexity (simple heuristic based on task length and keywords)
     let task_complexity = {
         let base_complexity = (task.len() as f64 / 200.0).min(0.5);
@@ -363,6 +368,9 @@ Now begin!"#, tools_formatted);
                                     });
                                     println!("✅ Tool result ({}ms): {}", duration, tool_output.output);
                                     
+                                    // PRD 9: Collect tool result for validation
+                                    tool_results_log.push(tool_output.clone());
+                                    
                                     // Add tool result to memory
                                     use ollamabuddy::types::MemoryEntry;
                                     orchestrator.memory_mut().add(MemoryEntry::ToolCall {
@@ -398,6 +406,30 @@ Now begin!"#, tools_formatted);
                             }
                         }
                         AgentMsg::Final { result, summary } => {
+                            // PRD 9: Run validation on task completion
+                            if !tool_results_log.is_empty() {
+                                let expected_outputs = vec![task.to_string()];
+                                let validation_result = validation_orchestrator.orchestrate_validation(
+                                    &tool_results_log,
+                                    &expected_outputs,
+                                );
+                                
+                                if validation_result.success {
+                                    if verbose {
+                                        eprintln!("[VALIDATION] Task validated successfully (score: {:.2})",
+                                            validation_result.validation.score.overall);
+                                    }
+                                } else {
+                                    eprintln!("[VALIDATION] Task validation failed (score: {:.2})",
+                                        validation_result.validation.score.overall);
+                                    eprintln!("[VALIDATION] Failed checks: {:?}",
+                                        validation_result.validation.failed_checks()
+                                            .iter()
+                                            .map(|c| &c.name)
+                                            .collect::<Vec<_>>());
+                                }
+                            }
+                            
                             println!("\n✅ Task Complete!");
                             println!("{}", result);
                             if let Some(sum) = summary {
