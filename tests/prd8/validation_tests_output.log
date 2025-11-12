@@ -1,0 +1,88 @@
+   Compiling ollamabuddy v0.3.0 (/home/redblack/projects/ollamabuddy)
+warning: unused import: `ValidatorConfig`
+ --> src/validation/orchestrator.rs:5:51
+  |
+5 | use crate::validation::validator::{TaskValidator, ValidatorConfig};
+  |                                                   ^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `GoalNode`
+ --> src/planning/hierarchical.rs:6:40
+  |
+6 | use crate::planning::types::{GoalTree, GoalNode, NodeType, NodeId};
+  |                                        ^^^^^^^^
+
+warning: unused import: `GoalNode`
+ --> src/planning/complexity.rs:8:30
+  |
+8 | use crate::planning::types::{GoalNode, GoalTree};
+  |                              ^^^^^^^^
+
+warning: unused import: `GoalStatus`
+ --> src/planning/progress.rs:6:57
+  |
+6 | use crate::planning::types::{ProgressMetrics, GoalTree, GoalStatus};
+  |                                                         ^^^^^^^^^^
+
+warning: unused import: `EpisodeMetadata`
+   --> src/memory/episodic.rs:220:46
+    |
+220 |     use crate::memory::types::{ActionRecord, EpisodeMetadata, EpisodeOutcome};
+    |                                              ^^^^^^^^^^^^^^^
+
+warning: field `k` is never read
+   --> src/memory/patterns.rs:104:5
+    |
+102 | pub struct PatternMatcher {
+    |            -------------- field in this struct
+103 |     /// Number of hash functions
+104 |     k: usize,
+    |     ^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: comparison is useless due to type limits
+   --> src/validation/validator.rs:570:17
+    |
+570 |         assert!(validation.total_time_ms >= 0, "Should track execution time");
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_comparisons)]` on by default
+
+warning: `ollamabuddy` (lib test) generated 7 warnings (run `cargo fix --lib -p ollamabuddy --tests` to apply 5 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.97s
+     Running unittests src/lib.rs (target/debug/deps/ollamabuddy-e9fb9c4b23c74eec)
+
+running 28 tests
+test validation::orchestrator::tests::test_orchestrator_creation ... ok
+test validation::orchestrator::tests::test_max_attempts_enforcement ... ok
+test validation::orchestrator::tests::test_recovery_history_tracking ... ok
+test validation::orchestrator::tests::test_report_generation ... ok
+test validation::orchestrator::tests::test_recovery_plan_generation ... ok
+test validation::orchestrator::tests::test_orchestrator_reset ... ok
+test validation::orchestrator::tests::test_successful_validation_first_attempt ... ok
+test validation::orchestrator::tests::test_validation_with_recovery ... ok
+test validation::validator::tests::test_check_weights_sum ... ok
+test validation::validator::tests::test_content_quality_fail_placeholder ... ok
+test validation::validator::tests::test_content_quality_fail_short ... ok
+test validation::validator::tests::test_content_quality_pass ... ok
+test validation::validator::tests::test_custom_validator_config ... ok
+test validation::validator::tests::test_failed_checks_extraction ... ok
+test validation::validator::tests::test_failure_reasons_extraction ... ok
+test validation::validator::tests::test_format_correctness_fail_empty ... ok
+test validation::validator::tests::test_format_correctness_fail_error_indicator ... ok
+test validation::validator::tests::test_format_correctness_pass ... ok
+test validation::validator::tests::test_multiple_checks_all_enabled ... ok
+test validation::validator::tests::test_outcome_existence_fail ... ok
+test validation::validator::tests::test_outcome_existence_pass ... ok
+test validation::validator::tests::test_validation_score_calculation ... ok
+test validation::validator::tests::test_validation_attempt_tracking ... ok
+test validation::validator::tests::test_validation_state_failed ... ok
+test validation::validator::tests::test_validation_state_validated ... ok
+test validation::validator::tests::test_validation_threshold ... ok
+test validation::validator::tests::test_validation_timing ... ok
+test validation::validator::tests::test_validator_creation ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 266 filtered out; finished in 0.00s
+
