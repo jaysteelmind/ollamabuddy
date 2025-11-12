@@ -1,0 +1,72 @@
+   Compiling ollamabuddy v0.3.0 (/home/redblack/projects/ollamabuddy)
+warning: unused import: `ValidatorConfig`
+ --> src/validation/orchestrator.rs:5:51
+  |
+5 | use crate::validation::validator::{TaskValidator, ValidatorConfig};
+  |                                                   ^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `GoalNode`
+ --> src/planning/hierarchical.rs:6:40
+  |
+6 | use crate::planning::types::{GoalTree, GoalNode, NodeType, NodeId};
+  |                                        ^^^^^^^^
+
+warning: unused import: `GoalNode`
+ --> src/planning/complexity.rs:8:30
+  |
+8 | use crate::planning::types::{GoalNode, GoalTree};
+  |                              ^^^^^^^^
+
+warning: unused import: `GoalStatus`
+ --> src/planning/progress.rs:6:57
+  |
+6 | use crate::planning::types::{ProgressMetrics, GoalTree, GoalStatus};
+  |                                                         ^^^^^^^^^^
+
+warning: unused import: `EpisodeMetadata`
+   --> src/memory/episodic.rs:220:46
+    |
+220 |     use crate::memory::types::{ActionRecord, EpisodeMetadata, EpisodeOutcome};
+    |                                              ^^^^^^^^^^^^^^^
+
+warning: field `k` is never read
+   --> src/memory/patterns.rs:104:5
+    |
+102 | pub struct PatternMatcher {
+    |            -------------- field in this struct
+103 |     /// Number of hash functions
+104 |     k: usize,
+    |     ^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: comparison is useless due to type limits
+   --> src/validation/validator.rs:570:17
+    |
+570 |         assert!(validation.total_time_ms >= 0, "Should track execution time");
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_comparisons)]` on by default
+
+warning: `ollamabuddy` (lib test) generated 7 warnings (run `cargo fix --lib -p ollamabuddy --tests` to apply 5 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.57s
+     Running unittests src/lib.rs (target/debug/deps/ollamabuddy-e9fb9c4b23c74eec)
+
+running 12 tests
+test analysis::convergence::tests::test_record_progress ... ok
+test analysis::convergence::tests::test_convergence_prediction ... ok
+test analysis::convergence::tests::test_bounded_history ... ok
+test analysis::convergence::tests::test_detector_creation ... ok
+test analysis::convergence::tests::test_stagnation_detection_active ... ok
+test analysis::convergence::tests::test_stagnation_detection_insufficient_data ... ok
+test analysis::convergence::tests::test_stagnation_detection_stagnant ... ok
+test analysis::convergence::tests::test_reset ... ok
+test analysis::convergence::tests::test_termination_none ... ok
+test analysis::convergence::tests::test_termination_budget_exhausted ... ok
+test analysis::convergence::tests::test_termination_success ... ok
+test analysis::convergence::tests::test_velocity_calculation ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 294 filtered out; finished in 0.00s
+
