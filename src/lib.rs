@@ -1,4 +1,4 @@
-//! OllamaBuddy v0.4 - Terminal Agent Platform
+//! OllamaBuddy v0.4.1 - Terminal Agent Platform
 //! 
 //! A production-ready Rust terminal agent that transforms local Ollama models
 //! into capable autonomous assistants with mathematical guarantees.
