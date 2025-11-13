@@ -32,9 +32,6 @@ pub struct Args {
     #[arg(long)]
     pub cwd: Option<PathBuf>,
 
-    /// Enable interactive REPL mode
-    #[arg(long)]
-    pub repl: bool,
 
     /// Enable online mode (web_fetch tool)
     #[arg(long)]
@@ -64,6 +61,8 @@ pub struct Args {
 /// Available subcommands
 #[derive(Subcommand, Debug)]
 pub enum Commands {
+    /// Start interactive REPL mode
+    Start,
     /// Run system diagnostics and health checks
     Doctor,
 
@@ -177,7 +176,6 @@ mod tests {
             verbose: 0,
             quiet: true,
             command: None,
-            repl: false,
         };
         assert_eq!(args.verbosity(), Verbosity::Quiet);
     }
@@ -196,7 +194,6 @@ mod tests {
             verbose: 0,
             quiet: false,
             command: None,
-            repl: false,
         };
         assert_eq!(args.verbosity(), Verbosity::Normal);
     }
@@ -215,7 +212,6 @@ mod tests {
             verbose: 1,
             quiet: false,
             command: None,
-            repl: false,
         };
         assert_eq!(args.verbosity(), Verbosity::Verbose);
     }
@@ -234,7 +230,6 @@ mod tests {
             verbose: 2,
             quiet: false,
             command: None,
-            repl: false,
         };
         assert_eq!(args.verbosity(), Verbosity::VeryVerbose);
     }
@@ -253,7 +248,6 @@ mod tests {
             verbose: 0,
             quiet: false,
             command: None,
-            repl: false,
         };
         assert!(args.validate().is_ok());
     }
@@ -272,7 +266,6 @@ mod tests {
             verbose: 0,
             quiet: false,
             command: Some(Commands::Doctor),
-            repl: false,
         };
         assert!(args.validate().is_ok());
     }
@@ -291,7 +284,6 @@ mod tests {
             verbose: 0,
             quiet: false,
             command: None,
-            repl: false,
         };
         assert!(args.validate().is_err());
     }
@@ -310,7 +302,6 @@ mod tests {
             verbose: 0,
             quiet: false,
             command: Some(Commands::Doctor),
-            repl: false,
         };
         assert!(args.validate().is_err());
     }
@@ -329,7 +320,6 @@ mod tests {
             verbose: 0,
             quiet: false,
             command: None,
-            repl: false,
         };
         assert_eq!(args.ollama_url(), "http://localhost:8080");
     }

@@ -217,6 +217,10 @@ async fn main() -> Result<()> {
     let args = Args::parse();
 
     match &args.command {
+        Some(Commands::Start) => {
+            // Start interactive REPL mode
+            run_repl(&args).await?;
+        }
         Some(Commands::Doctor) => {
             run_doctor(&args).await?;
         }
@@ -230,19 +234,16 @@ async fn main() -> Result<()> {
             show_config(&args)?;
         }
         None => {
-            // Check for REPL mode
-            if args.repl {
-                // Run in interactive REPL mode
-                run_repl(&args).await?;
-            } else if let Some(task) = &args.task {
+            // No subcommand - run single task or show help
+            if let Some(task) = &args.task {
                 // Run single task (traditional CLI mode)
                 run_agent(&args, task).await?;
             } else {
                 // No task and no REPL - show usage
                 println!("OllamaBuddy v0.5.0 - Terminal Agent");
                 println!("\nUsage:");
-                println!("  ollamabuddy \"<task>\"          Run agent with task");
-                println!("  ollamabuddy --repl            Interactive REPL mode");
+                println!("  ollamabuddy <task>            Run agent with task");
+                println!("  ollamabuddy start             Interactive REPL mode");
                 println!("  ollamabuddy doctor            System health checks");
                 println!("  ollamabuddy models            List Ollama models");
                 println!("  ollamabuddy config            Show configuration");
