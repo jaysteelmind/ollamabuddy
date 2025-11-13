@@ -357,6 +357,8 @@ async fn main() -> Result<()> {
 
 
 async fn run_agent(args: &Args, task: &str) -> Result<()> {
+    // TODO PRD 10a Phase 3: Refactor to use ollamabuddy::execution::execute_agent_task()
+    // Current implementation works, but could be simplified by using shared execution logic
     use std::path::PathBuf;
     
     // 1. Bootstrap check
