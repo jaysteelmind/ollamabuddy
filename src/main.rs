@@ -3,7 +3,9 @@
 use anyhow::Result;
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
+use colored::Colorize;
 use ollamabuddy::budget::DynamicBudgetManager;
+use ollamabuddy::integration::agent::RAGAgent;
 use ollamabuddy::validation::ValidationOrchestrator;
 use ollamabuddy::analysis::ConvergenceDetector;
 use ollamabuddy::analysis::types::TerminationCondition;
@@ -246,6 +248,19 @@ async fn run_repl(args: &Args) -> Result<()> {
         .join(".ollamabuddy_history");
     
     let mut repl_session = ReplSession::with_history(history_path)?;
+    
+    // Initialize RAG agent for memory commands (best effort - don't fail REPL if it errors)
+    match RAGAgent::default_config().await {
+        Ok(rag_agent) => {
+            let rag_agent = std::sync::Arc::new(rag_agent);
+            repl_session.set_rag_agent(rag_agent);
+            println!("{}", "  ✓ Memory system initialized".green());
+        }
+        Err(e) => {
+            eprintln!("{}: Could not initialize memory system: {}", "Warning".yellow(), e);
+            eprintln!("  Memory commands (/memory, /stats) will not be available.");
+        }
+    }
     
     // Show welcome banner
     repl_session.show_welcome("v0.5.0", &args.model);

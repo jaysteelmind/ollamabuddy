@@ -20,6 +20,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use crate::repl::commands::{is_command, Command, CommandHandler};
+use crate::integration::agent::RAGAgent;
 pub use crate::repl::display::DisplayManager;
 pub use crate::repl::events::{AgentEvent, EventBus};
 use crate::repl::input::InputHandler;
@@ -92,6 +93,12 @@ impl ReplSession {
     /// - Ok(Some(input)) for normal input
     /// - Ok(None) for EOF/exit
     /// - Err for interrupt
+
+    /// Set RAG agent for memory commands
+    pub fn set_rag_agent(&mut self, rag_agent: std::sync::Arc<RAGAgent>) {
+        self.command_handler = CommandHandler::new().with_rag_agent(rag_agent);
+    }
+
     pub fn read_input(&mut self) -> Result<Option<String>> {
         self.display_manager.show_prompt()?;
         self.input_handler.read_line()

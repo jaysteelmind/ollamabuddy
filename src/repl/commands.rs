@@ -6,6 +6,8 @@
 use anyhow::Result;
 use colored::*;
 use crate::repl::session::SessionManager;
+use crate::integration::agent::RAGAgent;
+use crate::integration::commands::KnowledgeCommands;
 
 /// REPL command types
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,18 +21,31 @@ pub enum Command {
     Verbose { enable: bool },
     Clear,
     Files,
+    Memory { subcommand: Option<String>, args: Vec<String> },
+    Stats,
+    Knowledge,
     Unknown { input: String },
 }
 
 /// Command handler for parsing and executing REPL commands
 pub struct CommandHandler {
     verbose: bool,
+    rag_agent: Option<std::sync::Arc<RAGAgent>>,
 }
 
 impl CommandHandler {
     /// Create new command handler
     pub fn new() -> Self {
-        CommandHandler { verbose: false }
+        CommandHandler { 
+            verbose: false,
+            rag_agent: None,
+        }
+    }
+    
+    /// Set RAG agent for memory commands
+    pub fn with_rag_agent(mut self, rag_agent: std::sync::Arc<RAGAgent>) -> Self {
+        self.rag_agent = Some(rag_agent);
+        self
     }
     
     /// Parse input string into a command
@@ -67,6 +82,13 @@ impl CommandHandler {
             }
             "clear" | "cls" => Command::Clear,
             "files" => Command::Files,
+            "memory" | "mem" => {
+                let subcommand = parts.get(1).map(|s| s.to_string());
+                let args = parts.get(2..).unwrap_or(&[]).iter().map(|s| s.to_string()).collect();
+                Command::Memory { subcommand, args }
+            }
+            "stats" => Command::Stats,
+            "knowledge" | "kb" => Command::Knowledge,
             _ => Command::Unknown { input: input.to_string() },
         }
     }
@@ -115,6 +137,15 @@ impl CommandHandler {
                 self.show_files(session);
                 Ok(true)
             }
+            Command::Memory { subcommand, args } => {
+                self.handle_memory_command(subcommand.as_deref(), &args)
+            }
+            Command::Stats => {
+                self.handle_stats_command()
+            }
+            Command::Knowledge => {
+                self.handle_knowledge_command()
+            }
             Command::Unknown { input } => {
                 println!("{}", format!("Unknown command: {}", input).red());
                 println!("Type {} for available commands", "/help".cyan());
@@ -137,6 +168,9 @@ impl CommandHandler {
             ("/reset", "Clear session context and history"),
             ("/verbose [on|off]", "Toggle verbose output"),
             ("/clear, /cls", "Clear screen"),
+            ("/memory, /mem", "Memory system commands (status, search)"),
+            ("/stats", "Show detailed performance statistics"),
+            ("/knowledge, /kb", "Show knowledge base status"),
             ("/exit, /quit, /q", "Exit REPL"),
         ];
         
@@ -250,6 +284,70 @@ impl CommandHandler {
     pub fn set_verbose(&mut self, enable: bool) {
         self.verbose = enable;
     }
+
+    /// Handle /memory command
+    fn handle_memory_command(&self, subcommand: Option<&str>, args: &[String]) -> Result<bool> {
+        let Some(agent) = &self.rag_agent else {
+            println!("{}: Memory system not initialized", "Error".red());
+            println!("Start OllamaBuddy with memory enabled to use this feature.");
+            return Ok(true);
+        };
+
+        match subcommand {
+            Some("status") => {
+                tokio::runtime::Runtime::new()?.block_on(async {
+                    KnowledgeCommands::memory_status(agent).await
+                })?;
+            }
+            Some("search") => {
+                if args.len() < 2 {
+                    println!("{}: Usage: /memory search <category> <query>", "Error".red());
+                    println!("Categories: episode, knowledge, code, document");
+                    return Ok(true);
+                }
+                let category = &args[0];
+                let query = args[1..].join(" ");
+                tokio::runtime::Runtime::new()?.block_on(async {
+                    KnowledgeCommands::search_knowledge(agent, &query, category).await
+                })?;
+            }
+            Some("help") | None => {
+                KnowledgeCommands::memory_help();
+            }
+            Some(unknown) => {
+                println!("{}: Unknown memory subcommand '{}'", "Error".red(), unknown);
+                KnowledgeCommands::memory_help();
+            }
+        }
+        Ok(true)
+    }
+
+    /// Handle /stats command
+    fn handle_stats_command(&self) -> Result<bool> {
+        let Some(agent) = &self.rag_agent else {
+            println!("{}: Memory system not initialized", "Error".red());
+            return Ok(true);
+        };
+
+        tokio::runtime::Runtime::new()?.block_on(async {
+            KnowledgeCommands::show_statistics(agent).await
+        })?;
+        Ok(true)
+    }
+
+    /// Handle /knowledge command
+    fn handle_knowledge_command(&self) -> Result<bool> {
+        let Some(agent) = &self.rag_agent else {
+            println!("{}: Memory system not initialized", "Error".red());
+            return Ok(true);
+        };
+
+        // For now, just show status. Could expand to list/export/import later
+        tokio::runtime::Runtime::new()?.block_on(async {
+            KnowledgeCommands::memory_status(agent).await
+        })?;
+        Ok(true)
+    }
 }
 
 impl Default for CommandHandler {
@@ -262,6 +360,8 @@ impl Default for CommandHandler {
 pub fn is_command(input: &str) -> bool {
     input.trim().starts_with('/')
 }
+
+
 
 #[cfg(test)]
 mod tests {
