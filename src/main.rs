@@ -8,6 +8,7 @@ use ollamabuddy::validation::ValidationOrchestrator;
 use ollamabuddy::analysis::ConvergenceDetector;
 use ollamabuddy::analysis::types::TerminationCondition;
 use ollamabuddy::recovery::AdaptiveRecovery;
+use ollamabuddy::repl::{ReplSession, ReplConfig};
 use ollamabuddy::{
     cli::{Args, Commands, Verbosity},
     bootstrap::Bootstrap,
@@ -17,6 +18,199 @@ use ollamabuddy::{
     tools::ToolRuntime,
     telemetry::{TelemetryCollector, TelemetryEvent, TelemetryDisplay},
 };
+
+
+/// Run agent in interactive REPL mode
+/// Execute a task within REPL context with event emission
+async fn execute_task_in_repl(
+    args: &Args,
+    task: &str,
+    repl_session: &mut ReplSession,
+) -> Result<()> {
+    use std::path::PathBuf;
+    use std::time::Instant;
+    
+    let start_time = Instant::now();
+    let verbose = repl_session.is_verbose();
+    
+    // Emit planning started event
+    repl_session.event_bus().emit(
+        ollamabuddy::repl::events::AgentEvent::PlanningStarted {
+            task: task.to_string()
+        }
+    ).await;
+    
+    // Show planning progress
+    let pb = repl_session.display_mut().start_planning(task);
+    
+    // Bootstrap check (silent in REPL)
+    let bootstrap = Bootstrap::new(
+        args.host.clone(),
+        args.port,
+        args.model.clone(),
+    );
+    
+    if !bootstrap.check_ollama_running().await? {
+        repl_session.display().show_error("Ollama is not running! Start with: ollama serve");
+        return Err(anyhow::anyhow!("Ollama not running"));
+    }
+    
+    // Initialize components
+    let working_dir = args.cwd.clone().unwrap_or_else(|| {
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    });
+    
+    let ollama_url = format!("http://{}:{}", args.host, args.port);
+    
+    let config = AgentConfig {
+        ollama_url,
+        model: args.model.clone(),
+        max_iterations: 10,
+        verbose,
+    };
+    
+    let mut orchestrator = AgentOrchestrator::new(config)?;
+    let tool_runtime = ToolRuntime::new(&working_dir)?;
+    
+    // Update progress
+    repl_session.display().update_progress(&pb, 0.3, Some("Initializing agent"));
+    
+    // Initialize planning
+    orchestrator.initialize_planning(task)?;
+    
+    // Update progress
+    repl_session.display().update_progress(&pb, 0.6, Some("Creating execution plan"));
+    
+    // Get context from session
+    let context = repl_session.get_context();
+    
+    // Build system prompt (simplified for now)
+    let tool_descriptions = vec![
+        "list_dir: List files and directories",
+        "read_file: Read file contents",
+        "write_file: Write to file",
+        "run_command: Execute command",
+        "system_info: Get system info",
+        "web_fetch: Fetch web content",
+    ];
+    
+    let tools_formatted = tool_descriptions.join("\n  ");
+    let system_prompt = format!(
+        "You are an autonomous AI agent. Available tools:\n  {}\n\n{}",
+        tools_formatted,
+        if !context.is_empty() { format!("Previous context:\n{}", context) } else { String::new() }
+    );
+    
+    orchestrator.add_system_prompt(system_prompt);
+    orchestrator.add_user_goal(task.to_string());
+    orchestrator.set_goal(task.to_string());
+    
+    // Complete planning phase
+    repl_session.display().update_progress(&pb, 1.0, Some("Planning complete"));
+    pb.finish_and_clear();
+    
+    let planning_duration = start_time.elapsed().as_millis() as u64;
+    repl_session.event_bus().emit(
+        ollamabuddy::repl::events::AgentEvent::PlanningComplete {
+            duration_ms: planning_duration
+        }
+    ).await;
+    
+    repl_session.display().show_info(&format!("Planning complete ({}ms)", planning_duration));
+    
+    // For Phase 3 initial integration, we'll show a simplified execution
+    // Full integration with streaming, tools, validation will come next
+    repl_session.display().show_info("Task execution with full agent integration coming in next step");
+    repl_session.display().show_info(&format!("Task: {}", task));
+    
+    // Record task (placeholder result for now)
+    let total_duration = start_time.elapsed().as_millis() as u64;
+    let record = ollamabuddy::repl::session::TaskRecord {
+        task: task.to_string(),
+        result: "Phase 3 partial integration - planning complete".to_string(),
+        success: true,
+        duration_ms: total_duration,
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        files_modified: vec![],
+    };
+    
+    repl_session.record_task(record);
+    
+    Ok(())
+}
+
+async fn run_repl(args: &Args) -> Result<()> {
+    // Initialize REPL session with history
+    let history_path = std::env::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".ollamabuddy_history");
+    
+    let mut repl_session = ReplSession::with_history(history_path)?;
+    
+    // Show welcome banner
+    repl_session.show_welcome("v0.5.0", &args.model);
+    
+    // Main REPL loop
+    loop {
+        // Read user input
+        match repl_session.read_input() {
+            Ok(Some(input)) => {
+                if input.is_empty() {
+                    continue;
+                }
+                
+                // Handle input (command or task)
+                match repl_session.handle_input(&input) {
+                    Ok(should_continue) => {
+                        if !should_continue {
+                            // User requested exit
+                            break;
+                        }
+                        
+                        // Check if it was a command (already handled)
+                        if ollamabuddy::repl::commands::is_command(&input) {
+                            continue;
+                        }
+                        
+                        // Execute the task with full agent integration
+                        match execute_task_in_repl(&args, &input, &mut repl_session).await {
+                            Ok(()) => {
+                                // Task executed successfully
+                            }
+                            Err(e) => {
+                                repl_session.display().show_error(&format!("Task execution failed: {}", e));
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        repl_session.display().show_error(&format!("Error: {}", e));
+                    }
+                }
+            }
+            Ok(None) => {
+                // EOF (Ctrl-D) - exit gracefully
+                break;
+            }
+            Err(e) => {
+                // Interrupted (Ctrl-C) or other error
+                if e.to_string().contains("Interrupted") {
+                    println!("\nUse /exit to quit gracefully");
+                    continue;
+                } else {
+                    return Err(e);
+                }
+            }
+        }
+    }
+    
+    // Save session history
+    repl_session.save()?;
+    
+    Ok(())
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -36,20 +230,24 @@ async fn main() -> Result<()> {
             show_config(&args)?;
         }
         None => {
-            // No subcommand - run main agent with task from args
-            if let Some(task) = &args.task {
+            // Check for REPL mode
+            if args.repl {
+                // Run in interactive REPL mode
+                run_repl(&args).await?;
+            } else if let Some(task) = &args.task {
+                // Run single task (traditional CLI mode)
                 run_agent(&args, task).await?;
             } else {
-                println!("OllamaBuddy v0.2.1 - Terminal Agent");
-                println!("
-Usage:");
+                // No task and no REPL - show usage
+                println!("OllamaBuddy v0.5.0 - Terminal Agent");
+                println!("\nUsage:");
                 println!("  ollamabuddy \"<task>\"          Run agent with task");
+                println!("  ollamabuddy --repl            Interactive REPL mode");
                 println!("  ollamabuddy doctor            System health checks");
                 println!("  ollamabuddy models            List Ollama models");
                 println!("  ollamabuddy config            Show configuration");
                 println!("  ollamabuddy clean             Clear state/logs");
-                println!("
-Example:");
+                println!("\nExample:");
                 println!("  ollamabuddy \"List all .rs files and count lines of code\"");
                 println!();
             }

@@ -1,6 +1,6 @@
 [package]
 name = "ollamabuddy"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2021"
 authors = ["Jerome (Kubashen) Naidoo"]
 description = "Turn any local Ollama model into a capable terminal agent"
@@ -44,6 +44,8 @@ toml = "0.8"
 
 # PRD 3: Time utilities
 chrono = "0.4"
+rustyline = "13.0"
+colored = "2.1"
 
 [dev-dependencies]
 # Testing
