@@ -43,3 +43,6 @@ pub mod execution;
 
 // PRD 11 Phase 2: RAG Pipeline
 pub mod rag;
+
+// PRD 11 Phase 3: Cross-Session Learning
+pub mod session;
