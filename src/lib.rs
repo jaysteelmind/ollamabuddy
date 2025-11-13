@@ -6,8 +6,8 @@
 //! # Architecture
 //! 
 //! - **PRD 1**: Core streaming agent + context management
-//! - **PRD 2**: Tool runtime + parallel execution (not yet implemented)
-//! - **PRD 3**: Model advisor + telemetry (not yet implemented)
+//! - **PRD 2**: Tool runtime + parallel execution
+//! - **PRD 3**: Model advisor + telemetry
 
 // Module declarations for PRD 1
 pub mod errors;
@@ -33,3 +33,10 @@ pub mod doctor;
 pub mod cli;
 pub mod planning;
 pub mod memory;
+
+// Display mode abstraction for CLI and REPL
+pub mod display_mode;
+pub use display_mode::DisplayMode;
+
+// Shared execution logic for CLI and REPL
+pub mod execution;

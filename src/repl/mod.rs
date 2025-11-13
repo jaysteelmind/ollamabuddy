@@ -20,10 +20,10 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use crate::repl::commands::{is_command, Command, CommandHandler};
-use crate::repl::display::DisplayManager;
-use crate::repl::events::{AgentEvent, EventBus};
+pub use crate::repl::display::DisplayManager;
+pub use crate::repl::events::{AgentEvent, EventBus};
 use crate::repl::input::InputHandler;
-use crate::repl::session::{SessionManager, TaskRecord};
+pub use crate::repl::session::{SessionManager, TaskRecord};
 
 /// REPL session coordinator
 /// 
