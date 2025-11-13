@@ -29,6 +29,8 @@ async fn execute_task_in_repl(
 ) -> Result<()> {
     use std::path::PathBuf;
     use std::time::Instant;
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
     
     let start_time = Instant::now();
     let verbose = repl_session.is_verbose();
@@ -84,19 +86,40 @@ async fn execute_task_in_repl(
     // Get context from session
     let context = repl_session.get_context();
     
-    // Build system prompt (simplified for now)
+    // Build system prompt with full tool descriptions
     let tool_descriptions = vec![
-        "list_dir: List files and directories",
-        "read_file: Read file contents",
-        "write_file: Write to file",
-        "run_command: Execute command",
-        "system_info: Get system info",
-        "web_fetch: Fetch web content",
+        "list_dir: List files and directories. Args: path (string, required), recursive (bool, optional, default false)",
+        "read_file: Read contents of a text file. Args: path (string, required)",
+        "write_file: Write or append content to a file. Args: path (string, required), content (string, required), append (bool, optional, default false)",
+        "run_command: Execute a system command (supports shell pipes/redirects). Args: command (string, required), args (array of strings, optional), timeout_seconds (number, optional, default 60)",
+        "system_info: Get system information. Args: info_type (string, optional: 'os', 'cpu', 'memory', 'disk', 'all', default 'all')",
+        "web_fetch: Fetch content from a URL. Args: url (string, required), method (string, optional: 'GET' or 'POST', default 'GET'), timeout_seconds (number, optional, default 30)",
     ];
     
     let tools_formatted = tool_descriptions.join("\n  ");
-    let system_prompt = format!(
-        "You are an autonomous AI agent. Available tools:\n  {}\n\n{}",
+    
+    let system_prompt = format!(r#"You are an autonomous AI agent that helps users complete tasks using available tools.
+
+RESPONSE FORMAT - You MUST respond with valid JSON only:
+
+Tool call format:
+{{"type": "tool_call", "tool": "tool_name", "args": {{"key": "value"}}}}
+
+Completion format:
+{{"type": "final", "result": "description of what was accomplished"}}
+
+AVAILABLE TOOLS:
+  {}
+
+CRITICAL RULES:
+1. Output ONLY valid JSON (no plain text, no markdown, no explanations)
+2. Use exact tool names from the list above
+3. Provide all required arguments as specified
+4. After tool execution, you'll receive the result and can call another tool or complete the task
+
+{}
+
+Now begin!"#, 
         tools_formatted,
         if !context.is_empty() { format!("Previous context:\n{}", context) } else { String::new() }
     );
@@ -104,6 +127,10 @@ async fn execute_task_in_repl(
     orchestrator.add_system_prompt(system_prompt);
     orchestrator.add_user_goal(task.to_string());
     orchestrator.set_goal(task.to_string());
+    
+    // Transition state machine
+    use ollamabuddy::agent::StateEvent;
+    orchestrator.transition(StateEvent::StartSession)?;
     
     // Complete planning phase
     repl_session.display().update_progress(&pb, 1.0, Some("Planning complete"));
@@ -118,24 +145,96 @@ async fn execute_task_in_repl(
     
     repl_session.display().show_info(&format!("Planning complete ({}ms)", planning_duration));
     
-    // Execute task - for full implementation, we need to refactor run_agent
-    // to be callable from REPL context. For now, show that planning worked.
-    repl_session.display().show_info("Agent initialized and ready");
+    // Initialize telemetry
+    let telemetry = TelemetryCollector::new();
     
-    let total_duration = start_time.elapsed().as_millis() as u64;
+    // Calculate dynamic budget
+    let task_complexity = {
+        let base_complexity = (task.len() as f64 / 200.0).min(0.5);
+        let keyword_boost = if task.to_lowercase().contains("analyze") ||
+                                task.to_lowercase().contains("complex") ||
+                                task.to_lowercase().contains("multiple") {
+            0.3
+        } else {
+            0.0
+        };
+        (base_complexity + keyword_boost).min(1.0)
+    };
+    
+    let mut budget_manager = DynamicBudgetManager::new();
+    let max_iterations = budget_manager.calculate_budget(task_complexity);
+    
+    if verbose {
+        repl_session.display().show_info(&format!(
+            "Task complexity: {:.2}, Allocated iterations: {}",
+            task_complexity, max_iterations
+        ));
+    }
+    
+    // Create display mode for REPL (use CLI mode for now as DisplayManager is not Clone)
+    let display_mode = ollamabuddy::DisplayMode::cli();
+    
+    // Emit execution started event
+    repl_session.event_bus().emit(
+        ollamabuddy::repl::events::AgentEvent::ExecutionStarted {
+            tool: "agent".to_string()
+        }
+    ).await;
+    
+    // Execute task using shared function
+    let execution_result = ollamabuddy::execution::execute_agent_task(
+        &mut orchestrator,
+        &tool_runtime,
+        &telemetry,
+        max_iterations,
+        task,
+        verbose,
+        &display_mode,
+    ).await?;
+    
+    // Emit completion event
+    repl_session.event_bus().emit(
+        ollamabuddy::repl::events::AgentEvent::TaskComplete {
+            result: execution_result.output.clone(),
+            duration_ms: execution_result.duration.as_millis() as u64,
+        }
+    ).await;
+    
+    // Record task in session
     let record = ollamabuddy::repl::session::TaskRecord {
         task: task.to_string(),
-        result: "Task execution framework ready - full integration requires refactoring run_agent".to_string(),
-        success: true,
-        duration_ms: total_duration,
+        result: execution_result.output.clone(),
+        success: execution_result.success,
+        duration_ms: execution_result.duration.as_millis() as u64,
         timestamp: std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs(),
-        files_modified: vec![],
+        files_modified: execution_result.files_touched.iter()
+            .map(|s| PathBuf::from(s))
+            .collect(),
     };
     
     repl_session.record_task(record);
+    
+    // Show summary
+    if execution_result.success {
+        let duration_ms = execution_result.duration.as_millis() as u64;
+        repl_session.display_mut().finish_with_success(
+            &format!(
+                "Task completed ({} iterations, score: {:.2})",
+                execution_result.iterations,
+                execution_result.validation_score
+            ),
+            duration_ms
+        );
+    } else {
+        repl_session.display_mut().finish_with_error(&format!(
+            "Task incomplete after {:.2}s ({} iterations)",
+            execution_result.duration.as_secs_f64(),
+            execution_result.iterations
+        ));
+    }
     
     Ok(())
 }
@@ -179,12 +278,12 @@ async fn run_repl(args: &Args) -> Result<()> {
                                 // Task executed successfully
                             }
                             Err(e) => {
-                                repl_session.display().show_error(&format!("Task execution failed: {}", e));
+                                repl_session.display_mut().finish_with_error(&format!("Task execution failed: {}", e));
                             }
                         }
                     }
                     Err(e) => {
-                        repl_session.display().show_error(&format!("Error: {}", e));
+                        repl_session.display_mut().finish_with_error(&format!("Error: {}", e));
                     }
                 }
             }
