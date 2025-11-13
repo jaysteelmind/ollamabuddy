@@ -8,6 +8,7 @@ use ollamabuddy::validation::ValidationOrchestrator;
 use ollamabuddy::analysis::ConvergenceDetector;
 use ollamabuddy::analysis::types::TerminationCondition;
 use ollamabuddy::recovery::AdaptiveRecovery;
+use ollamabuddy::repl::{ReplSession, ReplConfig};
 use ollamabuddy::{
     cli::{Args, Commands, Verbosity},
     bootstrap::Bootstrap,
@@ -17,6 +18,88 @@ use ollamabuddy::{
     tools::ToolRuntime,
     telemetry::{TelemetryCollector, TelemetryEvent, TelemetryDisplay},
 };
+
+
+/// Run agent in interactive REPL mode
+async fn run_repl(args: &Args) -> Result<()> {
+    // Initialize REPL session with history
+    let history_path = std::env::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".ollamabuddy_history");
+    
+    let mut repl_session = ReplSession::with_history(history_path)?;
+    
+    // Show welcome banner
+    repl_session.show_welcome("v0.5.0", &args.model);
+    
+    // Main REPL loop
+    loop {
+        // Read user input
+        match repl_session.read_input() {
+            Ok(Some(input)) => {
+                if input.is_empty() {
+                    continue;
+                }
+                
+                // Handle input (command or task)
+                match repl_session.handle_input(&input) {
+                    Ok(should_continue) => {
+                        if !should_continue {
+                            // User requested exit
+                            break;
+                        }
+                        
+                        // Check if it was a command (already handled)
+                        if ollamabuddy::repl::commands::is_command(&input) {
+                            continue;
+                        }
+                        
+                        // It's a task - execute it using existing run_agent logic
+                        // For Phase 1, we'll show a placeholder message
+                        // Phase 2 will integrate full agent execution
+                        repl_session.display_mut().show_info("Task execution will be integrated in Phase 2");
+                        repl_session.display_mut().show_info(&format!("Task: {}", input));
+                        
+                        // Placeholder: record a mock task for demonstration
+                        let record = ollamabuddy::repl::session::TaskRecord {
+                            task: input.clone(),
+                            result: "Phase 2 integration pending".to_string(),
+                            success: true,
+                            duration_ms: 100,
+                            timestamp: std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs(),
+                            files_modified: vec![],
+                        };
+                        repl_session.record_task(record);
+                    }
+                    Err(e) => {
+                        repl_session.display().show_error(&format!("Error: {}", e));
+                    }
+                }
+            }
+            Ok(None) => {
+                // EOF (Ctrl-D) - exit gracefully
+                break;
+            }
+            Err(e) => {
+                // Interrupted (Ctrl-C) or other error
+                if e.to_string().contains("Interrupted") {
+                    println!("\nUse /exit to quit gracefully");
+                    continue;
+                } else {
+                    return Err(e);
+                }
+            }
+        }
+    }
+    
+    // Save session history
+    repl_session.save()?;
+    
+    Ok(())
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
