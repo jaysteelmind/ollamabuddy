@@ -46,3 +46,6 @@ pub mod rag;
 
 // PRD 11 Phase 3: Cross-Session Learning
 pub mod session;
+
+// PRD 11 Phase 4: Agent Integration
+pub mod integration;

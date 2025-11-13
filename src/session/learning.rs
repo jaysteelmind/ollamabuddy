@@ -1,5 +1,6 @@
 // PRD 11 Phase 3: Learning System - Coordinating cross-session intelligence
 use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -8,7 +9,7 @@ use crate::session::recording::{SessionData, SessionRecorder, TaskRecord};
 use crate::session::statistics::{CumulativeStats, StatisticsTracker, ToolStats};
 
 /// Learning system configuration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LearningConfig {
     /// Persistence configuration
     pub persistence: PersistenceConfig,
