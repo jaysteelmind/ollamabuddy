@@ -206,7 +206,7 @@ All performance targets achieved and verified through automated tests:
 
 ### Start REPL Mode
 ```bash
-$ ollamabuddy --repl
+$ ollamabuddy start
 ```
 
 ### Traditional CLI (Still Works)
@@ -225,7 +225,7 @@ $ ollamabuddy "create a Python script"
 
 ### Example Session
 ```
-$ ollamabuddy --repl
+$ ollamabuddy start
 
 ================================================================
   OllamaBuddy v0.5.0 - Interactive Terminal Agent
