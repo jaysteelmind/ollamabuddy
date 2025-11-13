@@ -4,6 +4,10 @@ use anyhow::Result;
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
 use ollamabuddy::budget::DynamicBudgetManager;
+use ollamabuddy::validation::ValidationOrchestrator;
+use ollamabuddy::analysis::ConvergenceDetector;
+use ollamabuddy::analysis::types::TerminationCondition;
+use ollamabuddy::recovery::AdaptiveRecovery;
 use ollamabuddy::{
     cli::{Args, Commands, Verbosity},
     bootstrap::Bootstrap,
@@ -214,6 +218,12 @@ Now begin!"#, tools_formatted);
     // PRD 8: Initialize dynamic budget manager
     let mut budget_manager = DynamicBudgetManager::new();
     
+    // PRD 9: Initialize validation system
+    let mut validation_orchestrator = ValidationOrchestrator::new();
+    let mut convergence_detector = ConvergenceDetector::new();
+    let mut adaptive_recovery = AdaptiveRecovery::new();
+    let mut tool_results_log: Vec<ollamabuddy::tools::types::ToolResult> = Vec::new();
+    
     // Estimate initial complexity (simple heuristic based on task length and keywords)
     let task_complexity = {
         let base_complexity = (task.len() as f64 / 200.0).min(0.5);
@@ -363,6 +373,9 @@ Now begin!"#, tools_formatted);
                                     });
                                     println!("✅ Tool result ({}ms): {}", duration, tool_output.output);
                                     
+                                    // PRD 9: Collect tool result for validation
+                                    tool_results_log.push(tool_output.clone());
+                                    
                                     // Add tool result to memory
                                     use ollamabuddy::types::MemoryEntry;
                                     orchestrator.memory_mut().add(MemoryEntry::ToolCall {
@@ -392,12 +405,69 @@ Now begin!"#, tools_formatted);
                                     orchestrator.transition(StateEvent::ContinueIteration)?;
                                 }
                                 Err(e) => {
+                                    // PRD 9 Phase 3: Adaptive recovery on tool failure
                                     eprintln!("❌ Tool execution failed: {}", e);
-                                    orchestrator.transition(StateEvent::ToolFailure)?;
+                                    
+                                    // Detect failure pattern
+                                    use ollamabuddy::recovery::types::FailureSymptom;
+                                    let symptom = FailureSymptom::ToolExecutionFailure {
+                                        tool_name: tool.clone(),
+                                        consecutive_failures: tool_results_log.iter()
+                                            .rev()
+                                            .take_while(|r| !r.success && r.tool == tool)
+                                            .count() + 1,
+                                    };
+                                    
+                                    if let Some(pattern) = adaptive_recovery.detect_pattern(symptom) {
+                                        let action = adaptive_recovery.select_recovery_action(&pattern);
+                                        
+                                        if verbose {
+                                            eprintln!("[RECOVERY] Detected pattern: {:?}", pattern.symptom);
+                                            eprintln!("[RECOVERY] Action: {:?}", action);
+                                        }
+                                        
+                                        // Apply recovery action (basic implementation)
+                                        match action {
+                                            ollamabuddy::recovery::types::RecoveryAction::Abort { reason } => {
+                                                eprintln!("[RECOVERY] Aborting: {}", reason);
+                                                orchestrator.transition(StateEvent::UnrecoverableError)?;
+                                            }
+                                            _ => {
+                                                // For other actions, transition to ToolFailure and continue
+                                                orchestrator.transition(StateEvent::ToolFailure)?;
+                                            }
+                                        }
+                                    } else {
+                                        orchestrator.transition(StateEvent::ToolFailure)?;
+                                    }
                                 }
                             }
                         }
                         AgentMsg::Final { result, summary } => {
+                            // PRD 9: Run validation on task completion
+                            if !tool_results_log.is_empty() {
+                                let expected_outputs = vec![task.to_string()];
+                                let validation_result = validation_orchestrator.orchestrate_validation(
+                                    &tool_results_log,
+                                    &expected_outputs,
+                                );
+                                
+                                if validation_result.success {
+                                    if verbose {
+                                        eprintln!("[VALIDATION] Task validated successfully (score: {:.2})",
+                                            validation_result.validation.score.overall);
+                                    }
+                                } else {
+                                    eprintln!("[VALIDATION] Task validation failed (score: {:.2})",
+                                        validation_result.validation.score.overall);
+                                    eprintln!("[VALIDATION] Failed checks: {:?}",
+                                        validation_result.validation.failed_checks()
+                                            .iter()
+                                            .map(|c| &c.name)
+                                            .collect::<Vec<_>>());
+                                }
+                            }
+                            
                             println!("\n✅ Task Complete!");
                             println!("{}", result);
                             if let Some(sum) = summary {
@@ -436,6 +506,55 @@ Now begin!"#, tools_formatted);
                         eprintln!("   Text: {}", unescaped);
                     }
                 }
+            }
+        }
+
+        // PRD 9 Phase 2: Track progress and check convergence
+        let current_progress = match orchestrator.state() {
+            ollamabuddy::agent::AgentState::Final => 1.0,
+            ollamabuddy::agent::AgentState::Executing => {
+                // Estimate progress based on successful tool executions
+                (tool_results_log.iter().filter(|r| r.success).count() as f64 * 0.15).min(0.9)
+            },
+            _ => iteration as f64 / max_iterations as f64 * 0.5,
+        };
+        
+        convergence_detector.record_progress(current_progress, iteration);
+        
+        if verbose {
+            if let Some(velocity) = convergence_detector.get_velocity() {
+                eprintln!("[CONVERGENCE] Progress: {:.2}, Velocity: {:.3}", 
+                    current_progress, velocity.velocity);
+            }
+        }
+
+        // Check for early termination conditions
+        let validation_score = if let Some(last_result) = tool_results_log.last() {
+            if last_result.success { 0.9 } else { 0.5 }
+        } else {
+            0.5
+        };
+        
+        let termination = convergence_detector.check_termination(
+            current_progress,
+            validation_score,
+            iteration,
+            max_iterations,
+        );
+        
+        if termination.should_terminate() {
+            match termination {
+                ollamabuddy::analysis::types::TerminationCondition::Success => {
+                    if verbose {
+                        eprintln!("[CONVERGENCE] Early success detected at iteration {}", iteration);
+                    }
+                    break;
+                }
+                ollamabuddy::analysis::types::TerminationCondition::Stagnation => {
+                    eprintln!("[CONVERGENCE] Stagnation detected at iteration {}", iteration);
+                    break;
+                }
+                _ => {}
             }
         }
     }
