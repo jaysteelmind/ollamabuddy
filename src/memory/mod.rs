@@ -23,3 +23,13 @@ pub use patterns::PatternMatcher;
 pub use experience::ExperienceTracker;
 pub use working::WorkingMemory;
 pub use types::{Episode, EpisodeOutcome, PatternMatch, Recommendation};
+
+// PRD 11: Long-Term Memory & RAG Integration
+pub mod embedding;
+pub mod vector_db;
+pub mod knowledge_manager;  // Renamed to avoid conflict with existing knowledge.rs
+
+// Re-export key types for convenience
+pub use embedding::engine::EmbeddingEngine;
+pub use vector_db::manager::VectorDBManager;
+pub use knowledge_manager::manager::KnowledgeManager;
