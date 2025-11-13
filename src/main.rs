@@ -7,6 +7,7 @@ use ollamabuddy::budget::DynamicBudgetManager;
 use ollamabuddy::validation::ValidationOrchestrator;
 use ollamabuddy::analysis::ConvergenceDetector;
 use ollamabuddy::analysis::types::TerminationCondition;
+use ollamabuddy::recovery::AdaptiveRecovery;
 use ollamabuddy::{
     cli::{Args, Commands, Verbosity},
     bootstrap::Bootstrap,
@@ -220,6 +221,7 @@ Now begin!"#, tools_formatted);
     // PRD 9: Initialize validation system
     let mut validation_orchestrator = ValidationOrchestrator::new();
     let mut convergence_detector = ConvergenceDetector::new();
+    let mut adaptive_recovery = AdaptiveRecovery::new();
     let mut tool_results_log: Vec<ollamabuddy::tools::types::ToolResult> = Vec::new();
     
     // Estimate initial complexity (simple heuristic based on task length and keywords)
@@ -403,8 +405,41 @@ Now begin!"#, tools_formatted);
                                     orchestrator.transition(StateEvent::ContinueIteration)?;
                                 }
                                 Err(e) => {
+                                    // PRD 9 Phase 3: Adaptive recovery on tool failure
                                     eprintln!("❌ Tool execution failed: {}", e);
-                                    orchestrator.transition(StateEvent::ToolFailure)?;
+                                    
+                                    // Detect failure pattern
+                                    use ollamabuddy::recovery::types::FailureSymptom;
+                                    let symptom = FailureSymptom::ToolExecutionFailure {
+                                        tool_name: tool.clone(),
+                                        consecutive_failures: tool_results_log.iter()
+                                            .rev()
+                                            .take_while(|r| !r.success && r.tool == tool)
+                                            .count() + 1,
+                                    };
+                                    
+                                    if let Some(pattern) = adaptive_recovery.detect_pattern(symptom) {
+                                        let action = adaptive_recovery.select_recovery_action(&pattern);
+                                        
+                                        if verbose {
+                                            eprintln!("[RECOVERY] Detected pattern: {:?}", pattern.symptom);
+                                            eprintln!("[RECOVERY] Action: {:?}", action);
+                                        }
+                                        
+                                        // Apply recovery action (basic implementation)
+                                        match action {
+                                            ollamabuddy::recovery::types::RecoveryAction::Abort { reason } => {
+                                                eprintln!("[RECOVERY] Aborting: {}", reason);
+                                                orchestrator.transition(StateEvent::UnrecoverableError)?;
+                                            }
+                                            _ => {
+                                                // For other actions, transition to ToolFailure and continue
+                                                orchestrator.transition(StateEvent::ToolFailure)?;
+                                            }
+                                        }
+                                    } else {
+                                        orchestrator.transition(StateEvent::ToolFailure)?;
+                                    }
                                 }
                             }
                         }
