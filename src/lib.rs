@@ -40,3 +40,6 @@ pub use display_mode::DisplayMode;
 
 // Shared execution logic for CLI and REPL
 pub mod execution;
+
+// PRD 11 Phase 2: RAG Pipeline
+pub mod rag;
