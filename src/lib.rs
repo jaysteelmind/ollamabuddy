@@ -1,4 +1,4 @@
-//! OllamaBuddy v0.4.1 - Terminal Agent Platform
+//! OllamaBuddy v0.5.0 - Terminal Agent Platform
 //! 
 //! A production-ready Rust terminal agent that transforms local Ollama models
 //! into capable autonomous assistants with mathematical guarantees.
@@ -14,6 +14,7 @@ pub mod errors;
 pub mod types;
 pub mod budget;
 pub mod validation;
+pub mod repl;
 pub mod analysis;
 pub mod recovery;
 pub mod agent;
