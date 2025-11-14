@@ -370,6 +370,7 @@ impl CommandHandler {
     /// Handle model management commands
     fn handle_model_command(&self, subcommand: &str, args: &[String]) -> Result<bool> {
         use colored::Colorize;
+        use crate::config::Config;
         
         println!();
         
@@ -384,10 +385,50 @@ impl CommandHandler {
             "use" | "switch" => {
                 if args.is_empty() {
                     println!("{}", "Error: Model name required".red());
+                    println!("Usage: /model use <name>");
                     return Ok(true);
                 }
-                println!("{}", format!("Model: {}", args[0]).yellow());
-                println!("{}", "Note: Switching coming soon.".dimmed());
+                
+                let model_name = &args[0];
+                
+                // Load config and set default model
+                match Config::load() {
+                    Ok(mut config) => {
+                        config.set_default_model(model_name.to_string());
+                        match config.save() {
+                            Ok(()) => {
+                                println!("{} {}", "✓ Default model set to:".green(), model_name.bold());
+                                println!();
+                                println!("{}", "Restart REPL to use new model.".dimmed());
+                            }
+                            Err(e) => {
+                                println!("{} {}", "Error saving config:".red(), e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("{} {}", "Error loading config:".red(), e);
+                    }
+                }
+            }
+            "current" => {
+                match Config::load() {
+                    Ok(config) => {
+                        match config.get_default_model() {
+                            Some(model) => {
+                                println!("{} {}", "Current default model:".blue().bold(), model.green());
+                            }
+                            None => {
+                                println!("{}", "No default model set".yellow());
+                                println!();
+                                println!("{}", "Set a default with: /model use <name>".dimmed());
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("{} {}", "Error loading config:".red(), e);
+                    }
+                }
             }
             _ => self.show_model_help(),
         }
@@ -401,7 +442,9 @@ impl CommandHandler {
         use colored::Colorize;
         println!();
         println!("{}", "Model Commands:".cyan().bold());
-        println!("  /model list, /models");
+        println!("  /model list, /models     - List models (use CLI for full list)");
+        println!("  /model use <name>        - Set default model");
+        println!("  /model current           - Show current default model");
         println!();
     }
 }
