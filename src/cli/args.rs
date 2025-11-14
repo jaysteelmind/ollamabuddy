@@ -66,8 +66,9 @@ pub enum Commands {
     /// Run system diagnostics and health checks
     Doctor,
 
-    /// List available Ollama models
-    Models,
+    /// Manage Ollama models (list, pull, delete, info)
+    #[command(subcommand)]
+    Models(ModelsCommand),
 
     /// Clean agent state and temporary files
     Clean {
@@ -78,6 +79,36 @@ pub enum Commands {
 
     /// Display current configuration
     Config,
+}
+
+
+/// Models management subcommands
+#[derive(Subcommand, Debug)]
+pub enum ModelsCommand {
+    /// List all installed models
+    List,
+    
+    /// Pull (download) a model from Ollama library
+    Pull {
+        /// Model name to pull (e.g., llama3.1:8b)
+        name: String,
+    },
+    
+    /// Delete a model
+    Delete {
+        /// Model name to delete
+        name: String,
+        
+        /// Skip confirmation prompt
+        #[arg(short, long)]
+        force: bool,
+    },
+    
+    /// Show detailed information about a model
+    Info {
+        /// Model name
+        name: String,
+    },
 }
 
 /// Verbosity level enum
