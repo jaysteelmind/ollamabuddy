@@ -109,6 +109,15 @@ pub enum ModelsCommand {
         /// Model name
         name: String,
     },
+    
+    /// Set the default model
+    Use {
+        /// Model name to use as default
+        name: String,
+    },
+    
+    /// Show the current default model
+    Current,
 }
 
 /// Verbosity level enum
