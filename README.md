@@ -115,6 +115,32 @@ ollamabuddy models delete old-model:7b --force
 # Get help
 ollamabuddy models --help
 ```
+# List all installed models
+ollamabuddy models list
+
+# Download/pull a model
+ollamabuddy models pull <model-name>
+ollamabuddy models pull llama3.1:8b
+ollamabuddy models pull mistral:7b
+ollamabuddy models pull qwen2.5:7b-instruct
+
+# Delete a model (with confirmation)
+ollamabuddy models delete <model-name>
+ollamabuddy models delete old-model:7b
+
+# Delete a model (force, no confirmation)
+ollamabuddy models delete <model-name> --force
+ollamabuddy models delete old-model:7b -f
+
+# Show detailed model information
+ollamabuddy models info <model-name>
+ollamabuddy models info qwen2.5:7b-instruct
+
+# Get help
+ollamabuddy models --help
+ollamabuddy models pull --help
+ollamabuddy models delete --help
+ollamabuddy models info --help
 
 **Available Commands:**
 ```
