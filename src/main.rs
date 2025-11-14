@@ -327,7 +327,18 @@ async fn run_repl(args: &Args) -> Result<()> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args = Args::parse();
+    let mut args = Args::parse();
+    
+    // Load config and apply default model if set
+    if let Ok(config) = ollamabuddy::config::Config::load() {
+        if let Some(default_model) = config.get_default_model() {
+            // Only override if user didn't specify --model flag
+            // Check if model is still the default value
+            if args.model == "qwen2.5:7b-instruct" {
+                args.model = default_model.to_string();
+            }
+        }
+    }
 
     match &args.command {
         Some(Commands::Start) => {
@@ -941,6 +952,7 @@ async fn run_doctor(args: &Args) -> Result<()> {
 async fn handle_models_list(_args: &Args) -> Result<()> {
     use colored::Colorize;
     use ollamabuddy::models::ModelOperation;
+    use ollamabuddy::config::Config;
     
     let manager = ModelManager::new(None);
     
@@ -950,6 +962,10 @@ async fn handle_models_list(_args: &Args) -> Result<()> {
         eprintln!("Make sure Ollama is running: ollama serve");
         return Ok(());
     }
+    
+    // Load config to get default model
+    let config = Config::load().ok();
+    let default_model = config.as_ref().and_then(|c| c.get_default_model());
     
     match manager.list_models().await {
         ModelOperation::List(models) => {
@@ -966,7 +982,10 @@ Install a model with:");
             
             for model in models {
                 let description = model.description();
-                println!("  {} {}", "•".bright_green(), model.name.bright_white().bold());
+                let is_default = default_model.map_or(false, |d| d == model.name);
+                let marker = if is_default { " *".green().bold() } else { "".normal() };
+                
+                println!("  {} {}{}", "•".bright_green(), model.name.bright_white().bold(), marker);
                 println!("    Size: {} | {}", model.formatted_size(), description.dimmed());
                 
                 if let Some(details) = &model.details {
@@ -975,6 +994,10 @@ Install a model with:");
                     }
                 }
                 println!();
+            }
+            
+            if default_model.is_some() {
+                println!("{}", "  * = default model".dimmed());
             }
         }
         ModelOperation::Error(e) => {
