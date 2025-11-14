@@ -33,6 +33,7 @@ pub mod doctor;
 pub mod cli;
 pub mod planning;
 pub mod memory;
+pub mod models;
 
 // Display mode abstraction for CLI and REPL
 pub mod display_mode;
