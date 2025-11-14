@@ -23,6 +23,7 @@ pub enum Command {
     Files,
     Memory { subcommand: Option<String>, args: Vec<String> },
     Stats,
+    Model { subcommand: String, args: Vec<String> },
     Knowledge,
     Unknown { input: String },
 }
@@ -89,6 +90,19 @@ impl CommandHandler {
             }
             "stats" => Command::Stats,
             "knowledge" | "kb" => Command::Knowledge,
+            "model" | "models" => {
+                if parts.len() < 2 {
+                    Command::Model {
+                        subcommand: "list".to_string(),
+                        args: vec![],
+                    }
+                } else {
+                    Command::Model {
+                        subcommand: parts[1].to_string(),
+                        args: parts[2..].iter().map(|s| s.to_string()).collect(),
+                    }
+                }
+            }
             _ => Command::Unknown { input: input.to_string() },
         }
     }
@@ -146,6 +160,9 @@ impl CommandHandler {
             Command::Knowledge => {
                 self.handle_knowledge_command()
             }
+            Command::Model { subcommand, args } => {
+                self.handle_model_command(&subcommand, &args)
+            }
             Command::Unknown { input } => {
                 println!("{}", format!("Unknown command: {}", input).red());
                 println!("Type {} for available commands", "/help".cyan());
@@ -171,6 +188,7 @@ impl CommandHandler {
             ("/memory, /mem", "Memory system commands (status, search)"),
             ("/stats", "Show detailed performance statistics"),
             ("/knowledge, /kb", "Show knowledge base status"),
+            ("/model, /models", "Model management commands"),
             ("/exit, /quit, /q", "Exit REPL"),
         ];
         
@@ -348,8 +366,45 @@ impl CommandHandler {
         })?;
         Ok(true)
     }
-}
 
+    /// Handle model management commands
+    fn handle_model_command(&self, subcommand: &str, args: &[String]) -> Result<bool> {
+        use colored::Colorize;
+        
+        println!();
+        
+        match subcommand {
+            "list" => {
+                println!("{}", "Installed Models:".bright_blue().bold());
+                println!("{}", "═".repeat(60).bright_blue());
+                println!();
+                println!("{}", "Use CLI: ollamabuddy models list".cyan());
+                println!();
+            }
+            "use" | "switch" => {
+                if args.is_empty() {
+                    println!("{}", "Error: Model name required".red());
+                    return Ok(true);
+                }
+                println!("{}", format!("Model: {}", args[0]).yellow());
+                println!("{}", "Note: Switching coming soon.".dimmed());
+            }
+            _ => self.show_model_help(),
+        }
+        
+        println!();
+        Ok(true)
+    }
+    
+    /// Show model help
+    fn show_model_help(&self) {
+        use colored::Colorize;
+        println!();
+        println!("{}", "Model Commands:".cyan().bold());
+        println!("  /model list, /models");
+        println!();
+    }
+}
 impl Default for CommandHandler {
     fn default() -> Self {
         Self::new()
