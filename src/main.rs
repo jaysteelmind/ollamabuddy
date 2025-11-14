@@ -12,6 +12,7 @@ use ollamabuddy::analysis::types::TerminationCondition;
 use ollamabuddy::recovery::AdaptiveRecovery;
 use ollamabuddy::repl::{ReplSession, ReplConfig};
 use ollamabuddy::{
+    models::ModelManager,
     cli::{Args, Commands, Verbosity},
     bootstrap::Bootstrap,
     doctor::Doctor,
@@ -336,8 +337,22 @@ async fn main() -> Result<()> {
         Some(Commands::Doctor) => {
             run_doctor(&args).await?;
         }
-        Some(Commands::Models) => {
-            list_models(&args).await?;
+        Some(Commands::Models(models_cmd)) => {
+            use ollamabuddy::cli::ModelsCommand;
+            match models_cmd {
+                ModelsCommand::List => {
+                    handle_models_list(&args).await?;
+                }
+                ModelsCommand::Pull { name } => {
+                    handle_models_pull(&args, name).await?;
+                }
+                ModelsCommand::Delete { name, force } => {
+                    handle_models_delete(&args, name, *force).await?;
+                }
+                ModelsCommand::Info { name } => {
+                    handle_models_info(&args, name).await?;
+                }
+            }
         }
         Some(Commands::Clean { logs }) => {
             clean_state(&args, *logs).await?;
@@ -915,42 +930,214 @@ async fn run_doctor(args: &Args) -> Result<()> {
     std::process::exit(if report.is_healthy() { 0 } else { 1 });
 }
 
-async fn list_models(args: &Args) -> Result<()> {
-    let bootstrap = Bootstrap::new(
-        args.host.clone(),
-        args.port,
-        args.model.clone(),
-    );
 
-    println!("
-Checking Ollama models...
-");
-
-    match bootstrap.list_models().await {
-        Ok(models) => {
-            if models.is_empty() {
-                println!("No models installed.");
-                println!("
-Pull a model with:");
-                println!("  ollama pull qwen2.5:7b-instruct");
-            } else {
-                println!("Available models:");
-                for model in models {
-                    println!("  • {}", model);
-                }
-            }
-            println!();
-        }
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            eprintln!("
-Is Ollama running? Start with: ollama serve");
-            std::process::exit(1);
-        }
+/// Handle 'models list' command
+async fn handle_models_list(_args: &Args) -> Result<()> {
+    use colored::Colorize;
+    use ollamabuddy::models::ModelOperation;
+    
+    let manager = ModelManager::new(None);
+    
+    // Check if Ollama is available
+    if !manager.is_ollama_available().await {
+        eprintln!("{}", "Error: Cannot connect to Ollama server".red());
+        eprintln!("Make sure Ollama is running: ollama serve");
+        return Ok(());
     }
-
+    
+    match manager.list_models().await {
+        ModelOperation::List(models) => {
+            if models.is_empty() {
+                println!("{}", "No models installed".yellow());
+                println!("
+Install a model with:");
+                println!("  ollamabuddy models pull <model-name>");
+                return Ok(());
+            }
+            
+            println!("{}", "Installed Ollama Models:".bright_blue().bold());
+            println!();
+            
+            for model in models {
+                let description = model.description();
+                println!("  {} {}", "•".bright_green(), model.name.bright_white().bold());
+                println!("    Size: {} | {}", model.formatted_size(), description.dimmed());
+                
+                if let Some(details) = &model.details {
+                    if let Some(family) = &details.family {
+                        println!("    Family: {}", family.dimmed());
+                    }
+                }
+                println!();
+            }
+        }
+        ModelOperation::Error(e) => {
+            eprintln!("{} {}", "Error:".red(), e);
+        }
+        _ => unreachable!(),
+    }
+    
     Ok(())
 }
+
+/// Handle 'models pull' command
+async fn handle_models_pull(_args: &Args, name: &str) -> Result<()> {
+    use colored::Colorize;
+    use indicatif::{ProgressBar, ProgressStyle};
+    use ollamabuddy::models::{ModelOperation, PullProgress};
+    
+    let manager = ModelManager::new(None);
+    
+    // Check if Ollama is available
+    if !manager.is_ollama_available().await {
+        eprintln!("{}", "Error: Cannot connect to Ollama server".red());
+        eprintln!("Make sure Ollama is running: ollama serve");
+        return Ok(());
+    }
+    
+    println!("{} {}", "Pulling model:".bright_blue().bold(), name.bright_white());
+    println!();
+    
+    // Create progress bar
+    let pb = ProgressBar::new(100);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>3}% {msg}")
+            .unwrap()
+            .progress_chars("=>-"),
+    );
+    
+    // Clone pb for use in closure
+    let pb_clone = pb.clone();
+    let progress_callback = Box::new(move |progress: &PullProgress| {
+        if let (Some(total), Some(completed)) = (progress.total, progress.completed) {
+            let percentage = ((completed as f64 / total as f64) * 100.0) as u64;
+            pb_clone.set_position(percentage);
+            pb_clone.set_message(progress.status.clone());
+        } else {
+            pb_clone.set_message(progress.status.clone());
+        }
+    });
+    
+    match manager.pull_model(name, Some(progress_callback)).await {
+        ModelOperation::Pulled(_) => {
+            pb.finish_with_message("Complete");
+            println!();
+            println!("{} {}", "Successfully pulled:".bright_green().bold(), name.bright_white());
+        }
+        ModelOperation::Error(e) => {
+            pb.finish_and_clear();
+            eprintln!("{} {}", "Error:".red(), e);
+        }
+        _ => unreachable!(),
+    }
+    
+    Ok(())
+}
+
+/// Handle 'models delete' command
+async fn handle_models_delete(_args: &Args, name: &str, force: bool) -> Result<()> {
+    use colored::Colorize;
+    use std::io::{self, Write};
+    use ollamabuddy::models::ModelOperation;
+    
+    let manager = ModelManager::new(None);
+    
+    // Check if Ollama is available
+    if !manager.is_ollama_available().await {
+        eprintln!("{}", "Error: Cannot connect to Ollama server".red());
+        eprintln!("Make sure Ollama is running: ollama serve");
+        return Ok(());
+    }
+    
+    // Check if model exists
+    if !manager.model_exists(name).await {
+        eprintln!("{} Model '{}' not found", "Error:".red(), name);
+        return Ok(());
+    }
+    
+    // Get confirmation unless --force
+    if !force {
+        print!("{} Delete model '{}'? This cannot be undone. [y/N]: ", 
+               "Warning:".yellow().bold(), name.bright_white());
+        io::stdout().flush()?;
+        
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        
+        if !input.trim().eq_ignore_ascii_case("y") {
+            println!("Cancelled");
+            return Ok(());
+        }
+    }
+    
+    println!("Deleting model: {}", name);
+    
+    match manager.delete_model(name, force).await {
+        ModelOperation::Deleted(_) => {
+            println!("{} {}", "Successfully deleted:".bright_green().bold(), name.bright_white());
+        }
+        ModelOperation::Error(e) => {
+            eprintln!("{} {}", "Error:".red(), e);
+        }
+        _ => unreachable!(),
+    }
+    
+    Ok(())
+}
+
+/// Handle 'models info' command
+async fn handle_models_info(_args: &Args, name: &str) -> Result<()> {
+    use colored::Colorize;
+    use ollamabuddy::models::ModelOperation;
+    
+    let manager = ModelManager::new(None);
+    
+    // Check if Ollama is available
+    if !manager.is_ollama_available().await {
+        eprintln!("{}", "Error: Cannot connect to Ollama server".red());
+        eprintln!("Make sure Ollama is running: ollama serve");
+        return Ok(());
+    }
+    
+    match manager.show_model(name).await {
+        ModelOperation::Info(info) => {
+            println!("{}", "Model Information:".bright_blue().bold());
+            println!();
+            println!("  {} {}", "Name:".bold(), info.name.bright_white());
+            println!("  {} {}", "Size:".bold(), info.formatted_size());
+            println!("  {} {}", "Modified:".bold(), info.modified_at.format("%Y-%m-%d %H:%M:%S"));
+            println!("  {} {}", "Digest:".bold(), &info.digest[..16].dimmed());
+            
+            if let Some(details) = &info.details {
+                println!();
+                println!("  {}", "Details:".bold());
+                
+                if let Some(format) = &details.format {
+                    println!("    {} {}", "Format:".dimmed(), format);
+                }
+                if let Some(family) = &details.family {
+                    println!("    {} {}", "Family:".dimmed(), family);
+                }
+                if let Some(params) = &details.parameter_size {
+                    println!("    {} {}", "Parameters:".dimmed(), params);
+                }
+                if let Some(quant) = &details.quantization_level {
+                    println!("    {} {}", "Quantization:".dimmed(), quant);
+                }
+            }
+            
+            println!();
+        }
+        ModelOperation::Error(e) => {
+            eprintln!("{} {}", "Error:".red(), e);
+        }
+        _ => unreachable!(),
+    }
+    
+    Ok(())
+}
+
 
 async fn clean_state(_args: &Args, _logs: bool) -> Result<()> {
     use tokio::fs;
