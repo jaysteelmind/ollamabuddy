@@ -14,6 +14,26 @@ A production-ready Rust terminal agent that transforms local Ollama language mod
 
 ---
 
+##  What's New in v0.7.0
+
+### PRD 12: Ollama Model Management Integration
+
+Native model management - no more switching between `ollama` and `ollamabuddy`:
+
+-  **Unified Interface**: All model operations in one tool
+-  **4 CLI Commands**: list, pull, delete, info
+-  **Beautiful Output**: Colored terminal, progress bars
+-  **Safety First**: Confirmation prompts for destructive operations
+-  **Fast**: Sub-100ms for most operations
+
+**Manage models directly:**
+```bash
+ollamabuddy models list               # List all models
+ollamabuddy models pull llama3.1:8b   # Download with progress
+ollamabuddy models delete old:7b      # Remove with confirmation
+ollamabuddy models info qwen2.5:7b    # Show details
+```
+
 ##  What's New in v0.6.0
 
 ### PRD 11: Long-Term Memory & RAG Integration
@@ -74,6 +94,26 @@ ollamabuddy start
 ### Interactive REPL Mode
 ```bash
 ollamabuddy start
+```
+### Model Management
+```bash
+# List all installed models
+ollamabuddy models list
+
+# Download a model with progress bar
+ollamabuddy models pull llama3.1:8b
+
+# Show detailed model information
+ollamabuddy models info qwen2.5:7b-instruct
+
+# Delete a model (with confirmation)
+ollamabuddy models delete old-model:7b
+
+# Force delete without confirmation
+ollamabuddy models delete old-model:7b --force
+
+# Get help
+ollamabuddy models --help
 ```
 
 **Available Commands:**
