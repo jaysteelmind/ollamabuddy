@@ -352,6 +352,12 @@ async fn main() -> Result<()> {
                 ModelsCommand::Info { name } => {
                     handle_models_info(&args, name).await?;
                 }
+                ModelsCommand::Use { name } => {
+                    handle_models_use(&args, name).await?;
+                }
+                ModelsCommand::Current => {
+                    handle_models_current(&args).await?;
+                }
             }
         }
         Some(Commands::Clean { logs }) => {
@@ -1138,6 +1144,76 @@ async fn handle_models_info(_args: &Args, name: &str) -> Result<()> {
     Ok(())
 }
 
+
+
+async fn handle_models_use(_args: &Args, name: &str) -> Result<()> {
+    use colored::Colorize;
+    use ollamabuddy::models::{ModelManager, ModelOperation};
+    use ollamabuddy::config::Config;
+    
+    let manager = ModelManager::new(None);
+    
+    // Check if Ollama is available
+    if !manager.is_ollama_available().await {
+        eprintln!("{}", "Error: Ollama is not running".red());
+        eprintln!("Start Ollama first: {}", "ollama serve".dimmed());
+        return Ok(());
+    }
+    
+    // Verify model exists
+    if manager.model_exists(name).await {
+        // Model exists, set as default
+        let mut config = Config::load()?;
+        config.set_default_model(name.to_string());
+        config.save()?;
+        
+        println!("{} {}", "✓ Default model set to:".green(), name.bold());
+        println!("");
+        println!("{}", "The new model will be used for all future sessions.".dimmed());
+    } else {
+        eprintln!("{} '{}'", "Error: Model not found".red(), name);
+        eprintln!("");
+        eprintln!("Available models:");
+        
+        // List available models
+        match manager.list_models().await {
+            ModelOperation::List(models) => {
+                for model in models {
+                    eprintln!("  {} {}", "•".blue(), model.name);
+                }
+            }
+            _ => {
+                eprintln!("  (Could not retrieve model list)");
+            }
+        }
+        
+        eprintln!("");
+        eprintln!("Pull a model first: {}", format!("ollamabuddy models pull {}", name).dimmed());
+    }
+    
+    Ok(())
+}
+
+async fn handle_models_current(_args: &Args) -> Result<()> {
+    use colored::Colorize;
+    use ollamabuddy::config::Config;
+    
+    let config = Config::load()?;
+    
+    match config.get_default_model() {
+        Some(model) => {
+            println!("{} {}", "Current default model:".blue().bold(), model.green());
+        }
+        None => {
+            println!("{}", "No default model set".yellow());
+            println!("");
+            println!("{}", "Using Ollama's default model selection.".dimmed());
+            println!("Set a default with: {}", "ollamabuddy models use <name>".dimmed());
+        }
+    }
+    
+    Ok(())
+}
 
 async fn clean_state(_args: &Args, _logs: bool) -> Result<()> {
     use tokio::fs;
