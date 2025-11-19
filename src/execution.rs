@@ -3,6 +3,43 @@
 //! This module extracts the core agent execution loop from main.rs,
 //! making it reusable across different execution contexts (CLI and REPL).
 
+/// Extract complete JSON object from text that may contain thinking before JSON
+/// Returns the JSON substring, or the original text if no complete JSON found
+fn extract_json_object(text: &str) -> Option<&str> {
+    // Find all opening braces
+    for (i, c) in text.char_indices() {
+        if c == '{' {
+            // Try to find matching closing brace
+            let mut depth = 0;
+            let mut in_string = false;
+            let mut escape_next = false;
+
+            for (j, ch) in text[i..].char_indices() {
+                if escape_next {
+                    escape_next = false;
+                    continue;
+                }
+
+                match ch {
+                    '\\' if in_string => escape_next = true,
+                    '"' if !in_string => in_string = true,
+                    '"' if in_string => in_string = false,
+                    '{' if !in_string => depth += 1,
+                    '}' if !in_string => {
+                        depth -= 1;
+                        if depth == 0 {
+                            // Found complete JSON object
+                            return Some(&text[i..=i+j]);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    None
+}
+
 use crate::agent::{AgentOrchestrator, StateEvent};
 use crate::analysis::ConvergenceDetector;
 use crate::display_mode::DisplayMode;
@@ -98,40 +135,52 @@ pub async fn execute_agent_task(
         let client = orchestrator.client();
         let mut stream = client.generate_stream(prompt).await?;
         
-        display_mode.show_info("Model thinking...").await;
-        
+        display_mode.show_info("Agent:").await;
+
         let mut response_text = String::new();
-        
+
+        // Stream thinking in real-time
+        use std::io::Write;
+
         while let Some(chunk_result) = stream.next().await {
             let chunk_bytes = chunk_result?;
-            
+
             // Extract "response" field from Ollama API format
             if let Ok(ollama_response) = serde_json::from_slice::<serde_json::Value>(&chunk_bytes) {
                 if let Some(token) = ollama_response.get("response").and_then(|r| r.as_str()) {
                     response_text.push_str(token);
-                    
+
                     telemetry.record(TelemetryEvent::TokenReceived {
                         token: token.to_string(),
                         timestamp: Instant::now(),
                     });
+
+                    // Stream thinking text in real-time
+                    print!("{}", token);
+                    std::io::stdout().flush().ok();
                 }
             }
         }
-        
+
+        println!(); // New line after streaming
+
         // Parse accumulated response
         if !response_text.is_empty() {
             let trimmed = response_text.trim();
-            
-            // Unescape JSON if model outputs escaped quotes
+
+            // Unescape JSON first (model outputs escaped quotes)
             let unescaped = trimmed.replace(r#"\""#, r#"""#);
-            
+
+            // Extract JSON from the response (thinking comes before)
+            let json_str = extract_json_object(&unescaped).unwrap_or(&unescaped);
+
             if verbose {
                 display_mode
-                    .show_info(&format!("Parsing response: {}", &unescaped[..unescaped.len().min(100)]))
+                    .show_info(&format!("Extracted JSON: {}", &json_str[..json_str.len().min(100)]))
                     .await;
             }
-            
-            match serde_json::from_str::<AgentMsg>(&unescaped) {
+
+            match serde_json::from_str::<AgentMsg>(json_str) {
                 Ok(agent_msg) => {
                     match agent_msg {
                         AgentMsg::ToolCall { tool, args } => {
@@ -205,7 +254,23 @@ pub async fn execute_agent_task(
                                             .unwrap()
                                             .as_secs(),
                                     });
-                                    
+
+                                    // Add reflection prompt after tool execution
+                                    let reflection_prompt = format!(
+                                        "\n\nREFLECTION: You just executed '{}'. Result: {}\n\n\
+                                        Original task: {}\n\n\
+                                        Has the task been FULLY completed?\n\
+                                        - If YES: Output {{\"type\": \"final\", \"result\": \"description of what you accomplished\"}}\n\
+                                        - If NO: Either call another tool OR explain what still needs to be done.",
+                                        tool,
+                                        &tool_output.output[..tool_output.output.len().min(200)],
+                                        task
+                                    );
+
+                                    orchestrator.memory_mut().add(MemoryEntry::SystemPrompt {
+                                        content: reflection_prompt,
+                                    });
+
                                     // State transitions
                                     orchestrator.transition(StateEvent::ToolComplete)?;
                                     orchestrator.transition(StateEvent::ContinueIteration)?;

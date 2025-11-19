@@ -18,8 +18,8 @@ pub const DEFAULT_OLLAMA_URL: &str = "http://127.0.0.1:11434";
 /// Default model
 pub const DEFAULT_MODEL: &str = "qwen2.5:7b-instruct";
 
-/// Request timeout (30 seconds)
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+/// Request timeout (15 minutes for very large reasoning models like deepseek-r1:70b)
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(900);
 
 /// Ollama streaming client
 #[derive(Debug, Clone)]

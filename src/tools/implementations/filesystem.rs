@@ -26,8 +26,21 @@ pub async fn list_dir(
 ) -> Result<ToolResult> {
     let start = Instant::now();
 
+    // Expand home directory if path starts with ~
+    let expanded_path = if path.starts_with("~/") {
+        if let Ok(home) = std::env::var("HOME") {
+            format!("{}/{}", home, &path[2..])
+        } else {
+            path.to_string()
+        }
+    } else if path == "~" {
+        std::env::var("HOME").unwrap_or_else(|_| path.to_string())
+    } else {
+        path.to_string()
+    };
+
     // Verify path is within jail
-    let verified_path = jail.verify_and_canonicalize(path)?;
+    let verified_path = jail.verify_and_canonicalize(&expanded_path)?;
 
     // Check if path exists and is a directory
     if !verified_path.exists() {
@@ -144,8 +157,21 @@ pub async fn read_file(
 ) -> Result<ToolResult> {
     let start = Instant::now();
 
+    // Expand home directory if path starts with ~
+    let expanded_path = if path.starts_with("~/") {
+        if let Ok(home) = std::env::var("HOME") {
+            format!("{}/{}", home, &path[2..])
+        } else {
+            path.to_string()
+        }
+    } else if path == "~" {
+        std::env::var("HOME").unwrap_or_else(|_| path.to_string())
+    } else {
+        path.to_string()
+    };
+
     // Verify path is within jail
-    let verified_path = jail.verify_and_canonicalize(path)?;
+    let verified_path = jail.verify_and_canonicalize(&expanded_path)?;
 
     // Check if file exists
     if !verified_path.exists() {
@@ -221,11 +247,24 @@ pub async fn write_file(
         ));
     }
 
-    // Construct full path
-    let full_path = if std::path::Path::new(path).is_absolute() {
-        std::path::PathBuf::from(path)
+    // Expand home directory if path starts with ~
+    let expanded_path = if path.starts_with("~/") {
+        if let Ok(home) = std::env::var("HOME") {
+            format!("{}/{}", home, &path[2..])
+        } else {
+            path.to_string()
+        }
+    } else if path == "~" {
+        std::env::var("HOME").unwrap_or_else(|_| path.to_string())
     } else {
-        jail.jail_root().join(path)
+        path.to_string()
+    };
+
+    // Construct full path
+    let full_path = if std::path::Path::new(&expanded_path).is_absolute() {
+        std::path::PathBuf::from(&expanded_path)
+    } else {
+        jail.jail_root().join(&expanded_path)
     };
 
     // Create parent directories first (before verification)
@@ -238,7 +277,7 @@ pub async fn write_file(
     }
 
     // Now verify the path is within jail
-    let verified_path = jail.verify_and_canonicalize(path)?;
+    let verified_path = jail.verify_and_canonicalize(&expanded_path)?;
 
     // Write or append to file
     let result = if append {

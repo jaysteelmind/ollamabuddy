@@ -156,23 +156,23 @@ impl PathJail {
 /// Case 1: P is absolute
 ///   C = canonicalize(P)
 ///   Algorithm checks: C.starts_with(J)
-///   If check fails → Error (rejection)
-///   If check passes → C ∈ Subtree(J) ✓
-/// 
+///   If check fails -> Error (rejection)
+///   If check passes -> C in Subtree(J)
+///
 /// Case 2: P is relative
 ///   C = canonicalize(J.join(P))
 ///   By construction: C is derived from J
 ///   canonicalize() resolves all "..", ".", symlinks
 ///   Final check: C.starts_with(J)
-///   If check fails → Error (rejection, e.g., ".." escape)
-///   If check passes → C ∈ Subtree(J) ✓
-/// 
+///   If check fails -> Error (rejection, e.g., ".." escape)
+///   If check passes -> C in Subtree(J)
+///
 /// Case 3: Symlink in path
 ///   canonicalize() resolves all symlinks
 ///   Final path C is fully resolved
 ///   Check: C.starts_with(J)
-///   If fails → Error (symlink escape)
-///   If passes → C ∈ Subtree(J) ✓
+///   If fails -> Error (symlink escape)
+///   If passes -> C in Subtree(J)
 /// 
 /// Conclusion: In all cases, either:
 ///   - Algorithm rejects (Error), or

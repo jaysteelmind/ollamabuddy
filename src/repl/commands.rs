@@ -217,7 +217,7 @@ impl CommandHandler {
         
         for (i, record) in history.iter().enumerate() {
             let index = history.len() - i;
-            let status_icon = if record.success { "✓".green() } else { "✗".red() };
+            let status_icon = if record.success { "[OK]".green() } else { "[FAIL]".red() };
             let duration = format!("({}ms)", record.duration_ms).dimmed();
             
             println!("  {}. {} {} {}", 
@@ -397,7 +397,7 @@ impl CommandHandler {
                         config.set_default_model(model_name.to_string());
                         match config.save() {
                             Ok(()) => {
-                                println!("{} {}", "✓ Default model set to:".green(), model_name.bold());
+                                println!("{} {}", "[OK] Default model set to:".green(), model_name.bold());
                                 println!();
                                 println!("{}", "Restart REPL to use new model.".dimmed());
                             }

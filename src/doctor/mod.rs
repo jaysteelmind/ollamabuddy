@@ -14,9 +14,9 @@ pub enum CheckStatus {
 impl CheckStatus {
     fn symbol(&self) -> &str {
         match self {
-            Self::Pass => "✓",
-            Self::Warning => "⚠",
-            Self::Fail => "✗",
+            Self::Pass => "[OK]",
+            Self::Warning => "[WARN]",
+            Self::Fail => "[FAIL]",
         }
     }
 }
@@ -63,10 +63,10 @@ impl HealthReport {
         println!();
         
         if self.is_healthy() {
-            println!("  ✓ All checks passed - System is healthy
+            println!("  [OK] All checks passed - System is healthy
 ");
         } else {
-            println!("  ✗ Some checks failed - Run install script or fix manually
+            println!("  [FAIL] Some checks failed - Run install script or fix manually
 ");
         }
     }
@@ -239,9 +239,9 @@ mod tests {
 
     #[test]
     fn test_check_status_symbols() {
-        assert_eq!(CheckStatus::Pass.symbol(), "✓");
-        assert_eq!(CheckStatus::Warning.symbol(), "⚠");
-        assert_eq!(CheckStatus::Fail.symbol(), "✗");
+        assert_eq!(CheckStatus::Pass.symbol(), "[OK]");
+        assert_eq!(CheckStatus::Warning.symbol(), "[WARN]");
+        assert_eq!(CheckStatus::Fail.symbol(), "[FAIL]");
     }
 
     #[test]

@@ -75,8 +75,13 @@ async fn execute_task_in_repl(
     };
     
     let mut orchestrator = AgentOrchestrator::new(config)?;
-    let tool_runtime = ToolRuntime::new(&working_dir)?;
-    
+
+    // Use home directory as jail root for REPL mode to allow writes to ~/
+    let jail_root = std::env::var("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| working_dir.clone());
+    let tool_runtime = ToolRuntime::new(&jail_root)?;
+
     // Update progress
     repl_session.display().update_progress(&pb, 0.3, Some("Initializing agent"));
     
@@ -103,7 +108,10 @@ async fn execute_task_in_repl(
     
     let system_prompt = format!(r#"You are an autonomous AI agent that helps users complete tasks using available tools.
 
-RESPONSE FORMAT - You MUST respond with valid JSON only:
+RESPONSE FORMAT - Think out loud, then provide JSON:
+
+1. First, explain your reasoning (what you're trying to accomplish and why)
+2. Then, on a new line, output valid JSON for your action
 
 Tool call format:
 {{"type": "tool_call", "tool": "tool_name", "args": {{"key": "value"}}}}
@@ -115,14 +123,14 @@ AVAILABLE TOOLS:
   {}
 
 CRITICAL RULES:
-1. Output ONLY valid JSON (no plain text, no markdown, no explanations)
-2. Use exact tool names from the list above
-3. Provide all required arguments as specified
-4. After tool execution, you'll receive the result and can call another tool or complete the task
+1. Always explain your thinking before outputting JSON
+2. End your response with valid JSON on its own line
+3. Use exact tool names from the list above
+4. Provide all required arguments as specified
 
 {}
 
-Now begin!"#, 
+Now begin!"#,
         tools_formatted,
         if !context.is_empty() { format!("Previous context:\n{}", context) } else { String::new() }
     );
@@ -255,7 +263,7 @@ async fn run_repl(args: &Args) -> Result<()> {
         Ok(rag_agent) => {
             let rag_agent = std::sync::Arc::new(rag_agent);
             repl_session.set_rag_agent(rag_agent);
-            println!("{}", "  ✓ Memory system initialized".green());
+            println!("{}", "  [OK] Memory system initialized".green());
         }
         Err(e) => {
             eprintln!("{}: Could not initialize memory system: {}", "Warning".yellow(), e);
@@ -323,6 +331,43 @@ async fn run_repl(args: &Args) -> Result<()> {
     repl_session.save()?;
     
     Ok(())
+}
+
+/// Extract complete JSON object from text that may contain thinking before JSON
+/// Returns the JSON substring, or the original text if no complete JSON found
+fn extract_json_object(text: &str) -> Option<&str> {
+    // Find all opening braces
+    for (i, c) in text.char_indices() {
+        if c == '{' {
+            // Try to find matching closing brace
+            let mut depth = 0;
+            let mut in_string = false;
+            let mut escape_next = false;
+
+            for (j, ch) in text[i..].char_indices() {
+                if escape_next {
+                    escape_next = false;
+                    continue;
+                }
+
+                match ch {
+                    '\\' if in_string => escape_next = true,
+                    '"' if !in_string => in_string = true,
+                    '"' if in_string => in_string = false,
+                    '{' if !in_string => depth += 1,
+                    '}' if !in_string => {
+                        depth -= 1;
+                        if depth == 0 {
+                            // Found complete JSON object
+                            return Some(&text[i..=i+j]);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    None
 }
 
 #[tokio::main]
@@ -416,7 +461,7 @@ async fn run_agent(args: &Args, task: &str) -> Result<()> {
     );
     
     if !bootstrap.check_ollama_running().await? {
-        eprintln!("❌ Ollama is not running!");
+        eprintln!("[ERROR] Ollama is not running!");
         eprintln!("
 Start Ollama with: ollama serve");
         std::process::exit(2);
@@ -435,9 +480,14 @@ Start Ollama with: ollama serve");
         max_iterations: 10,
         verbose: matches!(args.verbosity(), Verbosity::Verbose | Verbosity::VeryVerbose),
     };
-    
+
     let mut orchestrator = AgentOrchestrator::new(config)?;
-    let tool_runtime = ToolRuntime::new(&working_dir)?;
+
+    // Use home directory as jail root for CLI mode to allow writes to ~/
+    let jail_root = std::env::var("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| working_dir.clone());
+    let tool_runtime = ToolRuntime::new(&jail_root)?;
     
     // Initialize advanced planning system (PRD 5)
     if matches!(args.verbosity(), Verbosity::Verbose | Verbosity::VeryVerbose) {
@@ -466,7 +516,10 @@ Start Ollama with: ollama serve");
     
     let system_prompt = format!(r#"You are an autonomous AI agent that helps users complete tasks using available tools.
 
-RESPONSE FORMAT - You MUST respond with valid JSON only:
+RESPONSE FORMAT - Think out loud, then provide JSON:
+
+1. First, explain your reasoning (what you're trying to accomplish and why)
+2. Then, on a new line, output valid JSON for your action
 
 Tool call format:
 {{\"type\": \"tool_call\", \"tool\": \"tool_name\", \"args\": {{\"key\": \"value\"}}}}
@@ -486,24 +539,24 @@ TOOL SELECTION GUIDELINES:
 - web_fetch: Use to download web content
 
 CRITICAL RULES:
-1. Output ONLY valid JSON (no plain text, no markdown, no explanations)
-2. Use exact tool names from the list above
-3. Provide all required arguments as specified
-4. For shell commands with pipes/redirects, use run_command with full command string
-5. After tool execution, you'll receive the result and can call another tool or complete the task
+1. Always explain your thinking before outputting JSON
+2. End your response with valid JSON on its own line
+3. Use exact tool names from the list above
+4. Provide all required arguments as specified
+5. For shell commands with pipes/redirects, use run_command with full command string
 
 EXAMPLES:
 
-List directory:
+Example 1:
+I need to see what files are in the src directory to understand the project structure.
 {{\"type\": \"tool_call\", \"tool\": \"list_dir\", \"args\": {{\"path\": \"src\"}}}}
 
-Count files with shell command:
+Example 2:
+To count all Rust files, I'll use the find command with a pipe to wc.
 {{\"type\": \"tool_call\", \"tool\": \"run_command\", \"args\": {{\"command\": \"find src -name '*.rs' | wc -l\"}}}}
 
-Read a file:
-{{\"type\": \"tool_call\", \"tool\": \"read_file\", \"args\": {{\"path\": \"README.md\"}}}}
-
-Task complete:
+Example 3:
+I've successfully counted all the Rust files. The task is complete.
 {{\"type\": \"final\", \"result\": \"Found 32 .rs files in src directory\"}}
 
 Now begin!"#, tools_formatted);
@@ -520,10 +573,10 @@ Now begin!"#, tools_formatted);
     // PRD 7: Initialize working memory with goal
     orchestrator.set_goal(task.to_string());
     
-    println!("🤖 OllamaBuddy Agent Starting...");
-    println!("📋 Task: {}", task);
-    println!("📁 Working Directory: {:?}", working_dir);
-    println!("🔧 Available Tools: {}", tool_runtime.tool_names().join(", "));
+    println!("OllamaBuddy Agent Starting...");
+    println!("Task: {}", task);
+    println!("Working Directory: {:?}", working_dir);
+    println!("Available Tools: {}", tool_runtime.tool_names().join(", "));
     println!();
     
     // 4. Start state machine
@@ -608,81 +661,75 @@ Now begin!"#, tools_formatted);
                 after_tokens: tokens_after,
                 timestamp: std::time::Instant::now(),
             });
-            println!("🗜️  Compressed context: {} → {} tokens", tokens_before, tokens_after);
+            println!("Compressed context: {} -> {} tokens", tokens_before, tokens_after);
         }
         
         // Build prompt
         let prompt = orchestrator.build_prompt();
         
         if matches!(args.verbosity(), Verbosity::Verbose | Verbosity::VeryVerbose) {
-            println!("📝 Prompt ({} tokens)", orchestrator.token_count());
+            println!("Prompt ({} tokens)", orchestrator.token_count());
         }
         
         // Stream response from Ollama
         let client = orchestrator.client();
         let mut stream = client.generate_stream(prompt).await?;
         
-        let thinking_pb = ProgressBar::new_spinner();
-        thinking_pb.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.cyan} {msg}")
-                .unwrap()
-        );
-        thinking_pb.set_message("Model thinking...");
-        thinking_pb.enable_steady_tick(std::time::Duration::from_millis(100));
-        
+        // Stream thinking in real-time (no progress bar needed)
+        println!("\nAgent:");
+
         let mut response_text_accumulator = String::new();
         let mut token_count = 0;
-        
+
         use futures_util::StreamExt;
+        use std::io::Write;
+
         while let Some(chunk_result) = stream.next().await {
             let chunk_bytes = chunk_result?;
-            
+
             // Extract "response" field from Ollama API format
             if let Ok(ollama_response) = serde_json::from_slice::<serde_json::Value>(&chunk_bytes) {
                 if let Some(token) = ollama_response.get("response").and_then(|r| r.as_str()) {
                     response_text_accumulator.push_str(token);
                     token_count += 1;
-                    
+
                     // Report token to telemetry
                     telemetry.record(TelemetryEvent::TokenReceived {
                         token: token.to_string(),
                         timestamp: std::time::Instant::now(),
                     });
-                    
-                    if matches!(args.verbosity(), Verbosity::VeryVerbose) {
-                        print!("{}", token);
-                        use std::io::Write;
-                        std::io::stdout().flush().ok();
-                    }
+
+                    // Stream thinking text in real-time (always, not just verbose)
+                    print!("{}", token);
+                    std::io::stdout().flush().ok();
                 }
             }
         }
-        
-        thinking_pb.finish_and_clear();
+
+        println!(); // New line after streaming
         
         // Parse accumulated response as AgentMsg
         if !response_text_accumulator.is_empty() {
             let trimmed = response_text_accumulator.trim();
-            
-            // Unescape JSON if model outputs escaped quotes
-            // Model may output: {\"type\": \"tool_call\"}
-            // We need: {"type": "tool_call"}
-            let unescaped = trimmed
-                .replace(r#"\""#, r#"""#)  // Replace backslash-quote with quote
-                .to_string();
-            
+
+            // Unescape JSON first (model outputs escaped quotes)
+            let unescaped = trimmed.replace(r#"\""#, r#"""#);
+
+            // Extract JSON from the response (thinking comes before)
+            // Find complete JSON object by matching braces
+            let json_str = extract_json_object(&unescaped).unwrap_or(&unescaped);
+
             if matches!(args.verbosity(), Verbosity::VeryVerbose) {
-                eprintln!("\n[DEBUG] Parsing: {}", unescaped);
+                eprintln!("\n[DEBUG] Extracted JSON: {}", json_str);
             }
-            
-            match serde_json::from_str::<ollamabuddy::types::AgentMsg>(&unescaped) {
+
+            match serde_json::from_str::<ollamabuddy::types::AgentMsg>(json_str) {
                 Ok(agent_msg) => {
                     use ollamabuddy::types::AgentMsg;
                     
                     match agent_msg {
                         AgentMsg::ToolCall { tool, args } => {
-                            println!("🔧 Tool call: {} with args: {:?}", tool, args);
+                            println!("Tool call: {} with args: {:?}", tool, args);
                             
                             let tool_start = std::time::Instant::now();
                             telemetry.record(TelemetryEvent::ToolStarted {
@@ -716,7 +763,7 @@ Now begin!"#, tools_formatted);
                                         success: true,
                                         timestamp: std::time::Instant::now(),
                                     });
-                                    println!("✅ Tool result ({}ms): {}", duration, tool_output.output);
+                                    println!("[OK] Tool result ({}ms): {}", duration, tool_output.output);
                                     
                                     // PRD 9: Collect tool result for validation
                                     tool_results_log.push(tool_output.clone());
@@ -742,16 +789,32 @@ Now begin!"#, tools_formatted);
                                             .unwrap()
                                             .as_secs(),
                                     });
-                                    
+
+                                    // Add reflection prompt after tool execution
+                                    let reflection_prompt = format!(
+                                        "\n\nREFLECTION: You just executed '{}'. Result: {}\n\n\
+                                        Original task: {}\n\n\
+                                        Has the task been FULLY completed?\n\
+                                        - If YES: Output {{\"type\": \"final\", \"result\": \"description of what you accomplished\"}}\n\
+                                        - If NO: Either call another tool OR explain what still needs to be done.",
+                                        tool,
+                                        &tool_output.output[..tool_output.output.len().min(200)],
+                                        task
+                                    );
+
+                                    orchestrator.memory_mut().add(MemoryEntry::SystemPrompt {
+                                        content: reflection_prompt,
+                                    });
+
                                     // Transition: Executing -> Verifying
                                     orchestrator.transition(StateEvent::ToolComplete)?;
-                                    
+
                                     // Immediately transition: Verifying -> Planning for next iteration
                                     orchestrator.transition(StateEvent::ContinueIteration)?;
                                 }
                                 Err(e) => {
                                     // PRD 9 Phase 3: Adaptive recovery on tool failure
-                                    eprintln!("❌ Tool execution failed: {}", e);
+                                    eprintln!("[ERROR] Tool execution failed: {}", e);
                                     
                                     // Detect failure pattern
                                     use ollamabuddy::recovery::types::FailureSymptom;
@@ -813,7 +876,7 @@ Now begin!"#, tools_formatted);
                                 }
                             }
                             
-                            println!("\n✅ Task Complete!");
+                            println!("\n[SUCCESS] Task Complete!");
                             println!("{}", result);
                             if let Some(sum) = summary {
                                 println!("Summary: {}", sum);
@@ -822,23 +885,23 @@ Now begin!"#, tools_formatted);
                             break;
                         }
                         AgentMsg::Plan { steps, reasoning } => {
-                            println!("📋 Plan created:");
+                            println!("Plan created:");
                             for (i, step) in steps.iter().enumerate() {
                                 println!("   {}. {}", i + 1, step);
                             }
                             if let Some(reason) = reasoning {
-                                println!("💭 Reasoning: {}", reason);
+                                println!("Reasoning: {}", reason);
                             }
                             orchestrator.transition(StateEvent::PlanComplete)?;
                         }
                         AgentMsg::Ask { question } => {
-                            println!("❓ Model asks: {}", question);
+                            println!("Model asks: {}", question);
                             // For now, just continue
                         }
                         AgentMsg::Error { message, recoverable } => {
-                            eprintln!("❌ Model error: {}", message);
+                            eprintln!("[ERROR] Model error: {}", message);
                             if recoverable {
-                                println!("⚠️  Error is recoverable, continuing...");
+                                println!("[WARNING] Error is recoverable, continuing...");
                             } else {
                                 orchestrator.transition(StateEvent::UnrecoverableError)?;
                             }
@@ -847,7 +910,7 @@ Now begin!"#, tools_formatted);
                 }
                 Err(e) => {
                     if matches!(args.verbosity(), Verbosity::Verbose | Verbosity::VeryVerbose) {
-                        eprintln!("\n⚠️  Parse failed: {}", e);
+                        eprintln!("\n[WARNING] Parse failed: {}", e);
                         eprintln!("   Text: {}", unescaped);
                     }
                 }
@@ -905,10 +968,10 @@ Now begin!"#, tools_formatted);
     }
     
     if iteration >= max_iterations {
-        println!("\n⚠️  Maximum iterations reached");
+        println!("\n[WARNING] Maximum iterations reached");
     }
-    
-    println!("\n🏁 Agent finished");
+
+    println!("\nAgent finished");
     
     // Display telemetry summary
     println!();
@@ -985,7 +1048,7 @@ Install a model with:");
                 let is_default = default_model.map_or(false, |d| d == model.name);
                 let marker = if is_default { " *".green().bold() } else { "".normal() };
                 
-                println!("  {} {}{}", "•".bright_green(), model.name.bright_white().bold(), marker);
+                println!("  - {}{}", model.name.bright_white().bold(), marker);
                 println!("    Size: {} | {}", model.formatted_size(), description.dimmed());
                 
                 if let Some(details) = &model.details {
@@ -1190,7 +1253,7 @@ async fn handle_models_use(_args: &Args, name: &str) -> Result<()> {
         config.set_default_model(name.to_string());
         config.save()?;
         
-        println!("{} {}", "✓ Default model set to:".green(), name.bold());
+        println!("{} {}", "[OK] Default model set to:".green(), name.bold());
         println!("");
         println!("{}", "The new model will be used for all future sessions.".dimmed());
     } else {
@@ -1202,7 +1265,7 @@ async fn handle_models_use(_args: &Args, name: &str) -> Result<()> {
         match manager.list_models().await {
             ModelOperation::List(models) => {
                 for model in models {
-                    eprintln!("  {} {}", "•".blue(), model.name);
+                    eprintln!("  - {}", model.name);
                 }
             }
             _ => {
@@ -1247,7 +1310,7 @@ async fn clean_state(_args: &Args, _logs: bool) -> Result<()> {
 
     if state_dir.exists() {
         fs::remove_dir_all(&state_dir).await?;
-        println!("✓ Cleaned state directory: {:?}", state_dir);
+        println!("[OK] Cleaned state directory: {:?}", state_dir);
     } else {
         println!("No state directory found.");
     }

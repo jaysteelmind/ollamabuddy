@@ -140,8 +140,8 @@ impl DisplayManager {
         if let Some(pb) = self.current_bar.take() {
             pb.finish_and_clear();
         }
-        println!("{} {} {}", 
-            "✓".green(),
+        println!("{} {} {}",
+            "[OK]".green(),
             message,
             format!("({}ms)", duration_ms).dimmed()
         );
@@ -152,7 +152,7 @@ impl DisplayManager {
         if let Some(pb) = self.current_bar.take() {
             pb.finish_and_clear();
         }
-        println!("{} {}", "✗".red(), message.red());
+        println!("{} {}", "[FAIL]".red(), message.red());
     }
     
     /// Display streaming tokens
@@ -165,9 +165,9 @@ impl DisplayManager {
     pub fn show_result(&self, result: &str, success: bool) {
         println!();
         if success {
-            println!("{} {}", "✓".green().bold(), "Task Complete!".green().bold());
+            println!("{} {}", "[OK]".green().bold(), "Task Complete!".green().bold());
         } else {
-            println!("{} {}", "✗".red().bold(), "Task Failed".red().bold());
+            println!("{} {}", "[FAIL]".red().bold(), "Task Failed".red().bold());
         }
         
         if !result.is_empty() {
@@ -184,8 +184,8 @@ impl DisplayManager {
             format!("FAILED (score: {:.2})", score).red()
         };
         
-        println!("{} Validation: {}", 
-            if success { "✓" } else { "✗" },
+        println!("{} Validation: {}",
+            if success { "[OK]" } else { "[FAIL]" },
             status
         );
     }
@@ -242,7 +242,7 @@ impl DisplayManager {
         };
         
         println!("\n{} {} | Time: {} | Iterations: {}",
-            if success { "✓" } else { "✗" },
+            if success { "[OK]" } else { "[FAIL]" },
             status.bold(),
             duration_str.dimmed(),
             iterations.to_string().dimmed()
@@ -258,7 +258,7 @@ impl DisplayManager {
     
     /// Show bullet point
     pub fn show_bullet(&self, text: &str) {
-        println!("  {} {}", "•".cyan(), text);
+        println!("  - {}", text.cyan());
     }
     
     /// Show numbered item

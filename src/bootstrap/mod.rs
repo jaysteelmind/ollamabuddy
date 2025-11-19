@@ -125,25 +125,25 @@ impl Bootstrap {
     /// Display installation instructions for Ollama
     pub fn show_ollama_install_instructions() {
         eprintln!("
-❌ Ollama not found or not running!");
+[ERROR] Ollama not found or not running!");
         eprintln!("
 Ollama is required to run OllamaBuddy.");
         eprintln!("
-📦 Installation:");
+Installation:");
         eprintln!("   Linux:   curl -fsSL https://ollama.com/install.sh | sh");
         eprintln!("   macOS:   brew install ollama");
         eprintln!("
-🚀 Start Ollama:");
+Start Ollama:");
         eprintln!("   ollama serve");
         eprintln!("
-📚 More info: https://ollama.com/download");
+More info: https://ollama.com/download");
         eprintln!();
     }
 
     /// Display instructions for pulling a model
     pub fn show_model_pull_instructions(model_tag: &str) {
         eprintln!("
-❌ Model '{}' not found!", model_tag);
+[ERROR] Model '{}' not found!", model_tag);
         eprintln!("
 To download this model, run:");
         eprintln!("   ollama pull {}", model_tag);
