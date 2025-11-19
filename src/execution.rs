@@ -97,11 +97,7 @@ pub async fn execute_agent_task(
         )
     {
         iteration += 1;
-        
-        display_mode
-            .show_info(&format!("\n=== Iteration {}/{} ===", iteration, max_iterations))
-            .await;
-        
+
         // Check context and compress if needed
         let tokens_before = orchestrator.token_count();
         orchestrator.maybe_compress()?;
@@ -335,14 +331,8 @@ pub async fn execute_agent_task(
                                             ))
                                             .await;
                                     }
-                                } else {
-                                    display_mode
-                                        .show_warning(&format!(
-                                            "Validation score: {:.2}",
-                                            validation_result.validation.score.overall
-                                        ))
-                                        .await;
                                 }
+                                // Don't show validation warnings - internal metric
                             }
                             
                             display_mode.show_success("Task Complete!").await;

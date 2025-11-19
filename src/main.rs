@@ -648,9 +648,7 @@ Now begin!"#, tools_formatted);
         ollamabuddy::agent::AgentState::Final | ollamabuddy::agent::AgentState::Error
     ) {
         iteration += 1;
-        println!("
-\n=== Iteration {} ===", iteration);
-        
+
         // Check context and compress if needed
         let tokens_before = orchestrator.token_count();
         orchestrator.maybe_compress()?;
@@ -865,15 +863,8 @@ Now begin!"#, tools_formatted);
                                         eprintln!("[VALIDATION] Task validated successfully (score: {:.2})",
                                             validation_result.validation.score.overall);
                                     }
-                                } else {
-                                    eprintln!("[VALIDATION] Task validation failed (score: {:.2})",
-                                        validation_result.validation.score.overall);
-                                    eprintln!("[VALIDATION] Failed checks: {:?}",
-                                        validation_result.validation.failed_checks()
-                                            .iter()
-                                            .map(|c| &c.name)
-                                            .collect::<Vec<_>>());
                                 }
+                                // Don't show validation warnings - internal metric
                             }
                             
                             println!("\n[SUCCESS] Task Complete!");
