@@ -128,20 +128,25 @@ CRITICAL RULES:
 3. Use exact tool names from the list above
 4. Provide all required arguments as specified
 5. When writing code files:
+   - NEVER use TODO comments or placeholder code - implement complete functionality
+   - NEVER write skeleton/template code - always provide full, working implementations
+   - Code must be immediately executable and functional, not just a framework
    - Use proper error handling (try/except in Python, proper error checks)
    - NEVER use shell=True in subprocess - use list arguments instead
    - Add input validation and sanitization
    - Include type hints and docstrings
    - Use meaningful variable names
-   - Add comments for complex logic
+   - Add comments explaining logic (NOT TODOs or placeholders)
    - Ensure code is production-ready, not just syntactically valid
    - Handle edge cases (empty inputs, missing files, permission errors)
    - Add logging for debugging
 6. Before marking task complete, verify:
+   - Code is COMPLETE with NO TODO comments or placeholders
    - Code runs without errors
    - All edge cases are handled
    - No security vulnerabilities
    - Code follows best practices
+   - All requested functionality is fully implemented
 
 CODE QUALITY EXAMPLES:
 
@@ -586,20 +591,25 @@ CRITICAL RULES:
 3. Use exact tool names from the list above
 4. Provide all required arguments as specified
 5. When writing code files:
+   - NEVER use TODO comments or placeholder code - implement complete functionality
+   - NEVER write skeleton/template code - always provide full, working implementations
+   - Code must be immediately executable and functional, not just a framework
    - Use proper error handling (try/except in Python, proper error checks)
    - NEVER use shell=True in subprocess - use list arguments instead
    - Add input validation and sanitization
    - Include type hints and docstrings
    - Use meaningful variable names
-   - Add comments for complex logic
+   - Add comments explaining logic (NOT TODOs or placeholders)
    - Ensure code is production-ready, not just syntactically valid
    - Handle edge cases (empty inputs, missing files, permission errors)
    - Add logging for debugging
 6. Before marking task complete, verify:
+   - Code is COMPLETE with NO TODO comments or placeholders
    - Code runs without errors
    - All edge cases are handled
    - No security vulnerabilities
    - Code follows best practices
+   - All requested functionality is fully implemented
 7. For shell commands with pipes/redirects, use run_command with full command string
 
 CODE QUALITY EXAMPLES:
