@@ -58,17 +58,10 @@ impl HierarchicalPlanner {
         // Create root node
         let mut tree = GoalTree::new(goal.to_string(), complexity);
 
-        // Recursively decompose if needed
-        if complexity >= self.atomic_threshold {
-            let root_id = tree.root;
-            self.decompose_recursive(&mut tree, root_id, 0, context).await?;
-        } else {
-            // Already atomic, update node type
-            let root_id = tree.root;
-            if let Some(root) = tree.nodes.get_mut(&root_id) {
-                root.node_type = NodeType::Atomic;
-            }
-        }
+        // Always use LLM-based planning - let the LLM decide if task is atomic
+        // The LLM will return empty array if task cannot be meaningfully decomposed
+        let root_id = tree.root;
+        self.decompose_recursive(&mut tree, root_id, 0, context).await?;
 
         Ok(tree)
     }

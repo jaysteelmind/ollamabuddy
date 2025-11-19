@@ -9,7 +9,7 @@ use std::path::PathBuf;
 #[derive(Parser, Debug)]
 #[command(name = "ollamabuddy")]
 #[command(author = "Jerome (Kubashen) Naidoo")]
-#[command(version = "0.2.0")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "Turn any local Ollama model into a capable terminal agent", long_about = None)]
 pub struct Args {
     /// Task description or goal for the agent
