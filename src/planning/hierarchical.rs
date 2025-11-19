@@ -1,25 +1,31 @@
 //! Hierarchical task decomposition with goal tree generation
 //!
 //! Provides top-down decomposition of complex goals into executable sub-goals
-//! with formal guarantees: DAG structure, bounded depth, bounded fanout.
+//! using LLM-based reasoning for intelligent planning.
 
 use crate::planning::types::{GoalTree, GoalNode, NodeType, NodeId};
 use crate::planning::complexity::ComplexityEstimator;
+use crate::streaming::OllamaClient;
 use crate::errors::Result;
+use futures_util::StreamExt;
+use serde_json::json;
 
-/// Hierarchical task planner
+/// Hierarchical task planner with LLM-based reasoning
 pub struct HierarchicalPlanner {
     /// Complexity estimator for goal analysis
     estimator: ComplexityEstimator,
-    
+
     /// Maximum decomposition depth (5)
     max_depth: usize,
-    
+
     /// Maximum children per node (7)
     max_fanout: usize,
-    
+
     /// Complexity threshold for atomic goals (0.2)
     atomic_threshold: f64,
+
+    /// Ollama client for LLM-based planning
+    client: Option<OllamaClient>,
 }
 
 impl HierarchicalPlanner {
@@ -30,26 +36,32 @@ impl HierarchicalPlanner {
             max_depth: 5,
             max_fanout: 7,
             atomic_threshold: 0.2,
+            client: None,
         }
+    }
+
+    /// Set the Ollama client for LLM-based planning
+    pub fn set_client(&mut self, client: OllamaClient) {
+        self.client = Some(client);
     }
     
     /// Decompose a goal into hierarchical sub-goals
     ///
-    /// Algorithm: Top-down recursive decomposition
+    /// Algorithm: Top-down recursive decomposition using LLM-based reasoning
     /// Complexity: O(n log n) where n = number of sub-goals
     ///
     /// Returns: GoalTree with DAG structure
-    pub fn decompose(&self, goal: &str, context: &[String]) -> Result<GoalTree> {
+    pub async fn decompose(&self, goal: &str, context: &[String]) -> Result<GoalTree> {
         // Estimate overall complexity
         let complexity = self.estimator.estimate(goal, context);
-        
+
         // Create root node
         let mut tree = GoalTree::new(goal.to_string(), complexity);
-        
+
         // Recursively decompose if needed
         if complexity >= self.atomic_threshold {
             let root_id = tree.root;
-            self.decompose_recursive(&mut tree, root_id, 0, context)?;
+            self.decompose_recursive(&mut tree, root_id, 0, context).await?;
         } else {
             // Already atomic, update node type
             let root_id = tree.root;
@@ -57,12 +69,12 @@ impl HierarchicalPlanner {
                 root.node_type = NodeType::Atomic;
             }
         }
-        
+
         Ok(tree)
     }
-    
+
     /// Recursive decomposition implementation
-    fn decompose_recursive(
+    async fn decompose_recursive(
         &self,
         tree: &mut GoalTree,
         parent_id: NodeId,
@@ -73,7 +85,7 @@ impl HierarchicalPlanner {
         if depth >= self.max_depth {
             return Ok(());
         }
-        
+
         // Get parent goal (clone to avoid borrow issues)
         let parent_goal = {
             let node = tree.nodes.get(&parent_id)
@@ -82,10 +94,10 @@ impl HierarchicalPlanner {
                 ))?;
             node.description.clone()
         };
-        
-        // Generate sub-goals
-        let sub_goals = self.generate_subgoals(&parent_goal, context)?;
-        
+
+        // Generate sub-goals using LLM
+        let sub_goals = self.generate_subgoals(&parent_goal, context).await?;
+
         // If no sub-goals or goal is already simple, mark as atomic
         if sub_goals.is_empty() {
             if let Some(node) = tree.nodes.get_mut(&parent_id) {
@@ -93,148 +105,119 @@ impl HierarchicalPlanner {
             }
             return Ok(());
         }
-        
+
         // Add sub-goals as children
         for sub_goal in sub_goals.iter().take(self.max_fanout) {
             let complexity = self.estimator.estimate(sub_goal, context);
-            
+
             let node_type = if complexity < self.atomic_threshold {
                 NodeType::Atomic
             } else {
                 NodeType::Composite
             };
-            
+
             let child_id = tree.add_child(
                 parent_id,
                 sub_goal.clone(),
                 node_type,
                 complexity,
             ).map_err(|e| crate::errors::AgentError::Generic(e))?;
-            
+
             // Recursively decompose composite children
             if node_type == NodeType::Composite {
-                self.decompose_recursive(tree, child_id, depth + 1, context)?;
+                Box::pin(self.decompose_recursive(tree, child_id, depth + 1, context)).await?;
             }
         }
-        
+
         Ok(())
     }
     
-    /// Generate sub-goals for a given goal
+    /// Generate sub-goals for a given goal using LLM-based reasoning
     ///
-    /// Uses heuristic-based decomposition strategies
-    fn generate_subgoals(&self, goal: &str, _context: &[String]) -> Result<Vec<String>> {
-        let goal_lower = goal.to_lowercase();
-        let mut sub_goals = Vec::new();
-        
-        // Strategy 1: Sequential operations (indicated by "and", "then")
-        if goal_lower.contains(" and ") || goal_lower.contains(" then ") {
-            sub_goals.extend(self.decompose_sequential(goal));
-        }
-        
-        // Strategy 2: File operations on multiple targets
-        else if (goal_lower.contains("all") || goal_lower.contains("each")) 
-            && (goal_lower.contains("file") || goal_lower.contains("directory")) {
-            sub_goals.extend(self.decompose_batch_operation(goal));
-        }
-        
-        // Strategy 3: Analysis and reporting pattern
-        else if goal_lower.contains("analyze") && goal_lower.contains("report") {
-            sub_goals.extend(self.decompose_analysis_report(goal));
-        }
-        
-        // Strategy 4: Search and process pattern
-        else if goal_lower.contains("find") && (goal_lower.contains("count") 
-            || goal_lower.contains("list") || goal_lower.contains("show")) {
-            sub_goals.extend(self.decompose_search_process(goal));
-        }
-        
-        // Strategy 5: Complex command patterns
-        else if goal_lower.contains("pipe") || goal_lower.contains("|") 
-            || goal_lower.contains("grep") || goal_lower.contains("sed") {
-            sub_goals.extend(self.decompose_pipeline(goal));
-        }
-        
-        // Strategy 6: Generic decomposition for unmatched patterns
-        else if self.estimator.estimate(goal, &[]) >= 0.3 {
-            sub_goals.extend(self.decompose_generic(goal));
-        }
-        
-        Ok(sub_goals)
-    }
-    
-    /// Decompose sequential operations (A and B and C)
-    fn decompose_sequential(&self, goal: &str) -> Vec<String> {
-        let mut sub_goals = Vec::new();
-        
-        // Split on "and", "then", ","
-        let separators = [" and ", " then ", ", and ", ", then "];
-        let mut parts = vec![goal.to_string()];
-        
-        for sep in &separators {
-            let mut new_parts = Vec::new();
-            for part in parts {
-                new_parts.extend(
-                    part.split(sep).map(|s| s.trim().to_string())
-                );
+    /// This method uses the LLM to actually think about task decomposition,
+    /// considering potential failure points, edge cases, and proper sequencing.
+    async fn generate_subgoals(&self, goal: &str, context: &[String]) -> Result<Vec<String>> {
+        // If no client available, return empty (will mark as atomic)
+        let client = match &self.client {
+            Some(c) => c,
+            None => return Ok(Vec::new()),
+        };
+
+        // Build deep planning prompt
+        let context_str = if context.is_empty() {
+            String::new()
+        } else {
+            format!("\n\nContext from previous steps:\n{}", context.join("\n"))
+        };
+
+        let planning_prompt = format!(r#"You are an intelligent task planning system. Break down the following task into concrete, executable steps.
+
+TASK: {}{}
+
+PLANNING GUIDELINES:
+1. Think deeply about what steps are actually needed
+2. Consider potential failure points (e.g., files not existing, permissions, syntax errors)
+3. Plan for verification of each step
+4. Consider edge cases like:
+   - Quote escaping in code generation
+   - Path handling (~/  vs absolute paths)
+   - File/directory existence checks
+5. Keep steps atomic and testable
+6. List steps in proper execution order
+
+OUTPUT FORMAT:
+Return ONLY a JSON array of step descriptions. Each step should be a clear, actionable task.
+Example: ["Step 1 description", "Step 2 description", "Step 3 description"]
+
+If the task is already atomic (cannot be meaningfully broken down), return an empty array: []
+
+STEPS:"#, goal, context_str);
+
+        // Call LLM for planning
+        let request = json!({
+            "model": "qwen2.5:14b-instruct",
+            "prompt": planning_prompt,
+            "stream": false,
+            "options": {
+                "temperature": 0.7,
+                "num_predict": 500
             }
-            parts = new_parts;
-        }
-        
-        // Clean up and filter
-        for part in parts {
-            let cleaned = part.trim().to_string();
-            if !cleaned.is_empty() && cleaned.len() > 3 {
-                sub_goals.push(cleaned);
+        });
+
+        let mut stream = client.generate_stream(serde_json::to_string(&request)
+            .map_err(|e| crate::errors::AgentError::Generic(format!("JSON error: {}", e)))?
+        ).await
+            .map_err(|e| crate::errors::AgentError::Generic(format!("LLM error: {}", e)))?;
+
+        // Collect full response
+        let mut response_text = String::new();
+        while let Some(chunk_result) = stream.next().await {
+            let chunk_bytes = chunk_result
+                .map_err(|e| crate::errors::AgentError::Generic(format!("Stream error: {}", e)))?;
+
+            if let Ok(ollama_response) = serde_json::from_slice::<serde_json::Value>(&chunk_bytes) {
+                if let Some(token) = ollama_response.get("response").and_then(|r| r.as_str()) {
+                    response_text.push_str(token);
+                }
             }
         }
-        
-        sub_goals
-    }
-    
-    /// Decompose batch operations (process all files)
-    fn decompose_batch_operation(&self, goal: &str) -> Vec<String> {
-        vec![
-            "List all target items".to_string(),
-            format!("Process each item from: {}", goal),
-            "Aggregate results".to_string(),
-        ]
-    }
-    
-    /// Decompose analysis and report pattern
-    fn decompose_analysis_report(&self, goal: &str) -> Vec<String> {
-        vec![
-            "Gather data for analysis".to_string(),
-            format!("Analyze: {}", goal),
-            "Generate report with results".to_string(),
-        ]
-    }
-    
-    /// Decompose search and process pattern
-    fn decompose_search_process(&self, goal: &str) -> Vec<String> {
-        vec![
-            format!("Search for items matching: {}", goal),
-            "Process found items".to_string(),
-            "Display or save results".to_string(),
-        ]
-    }
-    
-    /// Decompose pipeline operations
-    fn decompose_pipeline(&self, _goal: &str) -> Vec<String> {
-        vec![
-            "Prepare input data".to_string(),
-            "Execute pipeline stages".to_string(),
-            "Collect final output".to_string(),
-        ]
-    }
-    
-    /// Generic decomposition for complex goals
-    fn decompose_generic(&self, goal: &str) -> Vec<String> {
-        vec![
-            "Understand the requirement".to_string(),
-            format!("Execute: {}", goal),
-            "Verify and report results".to_string(),
-        ]
+
+        // Parse JSON response
+        let response_text = response_text.trim();
+
+        // Try to extract JSON array from response
+        let steps: Vec<String> = if let Some(start) = response_text.find('[') {
+            if let Some(end) = response_text.rfind(']') {
+                let json_str = &response_text[start..=end];
+                serde_json::from_str(json_str).unwrap_or_else(|_| Vec::new())
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        };
+
+        Ok(steps)
     }
 }
 

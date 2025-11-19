@@ -85,9 +85,9 @@ async fn execute_task_in_repl(
     // Update progress
     repl_session.display().update_progress(&pb, 0.3, Some("Initializing agent"));
     
-    // Initialize planning
-    orchestrator.initialize_planning(task)?;
-    
+    // Initialize planning (async - LLM-based reasoning)
+    orchestrator.initialize_planning(task).await?;
+
     // Update progress
     repl_session.display().update_progress(&pb, 0.6, Some("Creating execution plan"));
     
@@ -490,12 +490,12 @@ Start Ollama with: ollama serve");
         .unwrap_or_else(|_| working_dir.clone());
     let tool_runtime = ToolRuntime::new(&jail_root)?;
     
-    // Initialize advanced planning system (PRD 5)
+    // Initialize advanced planning system (PRD 5) - uses LLM for actual reasoning
     if matches!(args.verbosity(), Verbosity::Verbose | Verbosity::VeryVerbose) {
         println!("🧠 Initializing advanced planning system...");
     }
-    orchestrator.initialize_planning(task)?;
-    
+    orchestrator.initialize_planning(task).await?;
+
     if matches!(args.verbosity(), Verbosity::Verbose | Verbosity::VeryVerbose) {
         if let Some(progress) = orchestrator.planning_progress() {
             println!("📊 Initial planning complete. Progress: {:.1}%", progress * 100.0);

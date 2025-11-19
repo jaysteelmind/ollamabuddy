@@ -17,6 +17,8 @@ pub use types::{
     FailurePattern, ReplanningAction, ProgressMetrics,
 };
 
+use crate::streaming::OllamaClient;
+
 /// Advanced planning system integration
 pub struct AdvancedPlanner {
     pub hierarchical: hierarchical::HierarchicalPlanner,
@@ -37,15 +39,20 @@ impl AdvancedPlanner {
             progress: None,
         }
     }
-    
-    /// Initialize planning for a new goal
-    pub fn initialize(&mut self, goal: &str, context: &[String]) -> crate::errors::Result<()> {
-        // Decompose goal into tree
-        let goal_tree = self.hierarchical.decompose(goal, context)?;
-        
+
+    /// Set the Ollama client for LLM-based planning
+    pub fn set_client(&mut self, client: OllamaClient) {
+        self.hierarchical.set_client(client);
+    }
+
+    /// Initialize planning for a new goal (async for LLM-based planning)
+    pub async fn initialize(&mut self, goal: &str, context: &[String]) -> crate::errors::Result<()> {
+        // Decompose goal into tree using LLM-based reasoning
+        let goal_tree = self.hierarchical.decompose(goal, context).await?;
+
         // Initialize progress tracker
         self.progress = Some(progress::ProgressTracker::new(&goal_tree));
-        
+
         Ok(())
     }
     

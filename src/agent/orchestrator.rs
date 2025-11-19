@@ -280,10 +280,16 @@ impl AgentOrchestrator {
 
     /// Initialize advanced planning for a goal
     ///
-    /// PRD 5: Hierarchical decomposition, complexity estimation, strategy generation
-    pub fn initialize_planning(&mut self, goal: &str) -> Result<()> {
+    /// Uses LLM-based reasoning for intelligent task decomposition
+    pub async fn initialize_planning(&mut self, goal: &str) -> Result<()> {
         let mut planner = AdvancedPlanner::new();
-        planner.initialize(goal, &[])?;
+
+        // Pass Ollama client to planner for LLM-based reasoning
+        planner.set_client(self.client.clone());
+
+        // Initialize planning with LLM (this will take 2-5 seconds for actual thinking)
+        planner.initialize(goal, &[]).await?;
+
         self.planner = Some(planner);
         Ok(())
     }
