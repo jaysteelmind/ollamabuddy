@@ -70,7 +70,7 @@ async fn execute_task_in_repl(
     let config = AgentConfig {
         ollama_url,
         model: args.model.clone(),
-        max_iterations: 10,
+        max_iterations: 50,
         verbose,
     };
     
@@ -477,7 +477,7 @@ Start Ollama with: ollama serve");
     let config = AgentConfig {
         ollama_url,
         model: args.model.clone(),
-        max_iterations: 10,
+        max_iterations: 50,
         verbose: matches!(args.verbosity(), Verbosity::Verbose | Verbosity::VeryVerbose),
     };
 

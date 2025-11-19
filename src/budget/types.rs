@@ -5,18 +5,18 @@ use serde::{Deserialize, Serialize};
 /// Configuration for dynamic budget calculation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BudgetConfig {
-    /// Base iterations for simple tasks (default: 8)
+    /// Base iterations for simple tasks (default: 10)
     pub base_iterations: usize,
-    
-    /// Scaling factor for complexity (default: 25.0)
+
+    /// Scaling factor for complexity (default: 40.0)
     pub scale_factor: f64,
-    
+
     /// Uncertainty margin multiplier (default: 0.2)
     pub uncertainty_margin: f64,
-    
-    /// Absolute maximum budget (default: 50)
+
+    /// Absolute maximum budget (default: 100)
     pub max_budget: usize,
-    
+
     /// Warning threshold percentage (default: 0.8)
     pub warning_threshold: f64,
 }
@@ -24,10 +24,10 @@ pub struct BudgetConfig {
 impl Default for BudgetConfig {
     fn default() -> Self {
         Self {
-            base_iterations: 8,
-            scale_factor: 25.0,
+            base_iterations: 10,
+            scale_factor: 40.0,
             uncertainty_margin: 0.2,
-            max_budget: 50,
+            max_budget: 100,
             warning_threshold: 0.8,
         }
     }
