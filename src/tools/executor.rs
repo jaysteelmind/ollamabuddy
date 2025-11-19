@@ -93,9 +93,17 @@ impl ParallelExecutor {
             }
             "write_file" => {
                 let path = args["path"].as_str().unwrap_or("");
-                let content = args["content"].as_str().unwrap_or("");
+                let raw_content = args["content"].as_str().unwrap_or("");
+                // Unescape common escape sequences that models might output literally
+                let content = raw_content
+                    .replace("\\n", "\n")
+                    .replace("\\t", "\t")
+                    .replace("\\r", "\r")
+                    .replace("\\\"", "\"")
+                    .replace("\\'", "'")
+                    .replace("\\/", "/");
                 let append = args["append"].as_bool().unwrap_or(false);
-                implementations::write_file(path, content, append, &self.context, &self.jail).await
+                implementations::write_file(path, &content, append, &self.context, &self.jail).await
             }
             "run_command" => {
                 let command = args["command"].as_str().unwrap_or("");
