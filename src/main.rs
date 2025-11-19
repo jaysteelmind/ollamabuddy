@@ -133,6 +133,7 @@ CRITICAL RULES:
    - Code must be immediately executable and functional, not just a framework
    - Use proper error handling (try/except in Python, proper error checks)
    - NEVER use shell=True in subprocess - use list arguments instead
+   - NEVER use os.popen, os.system, or shell commands - use subprocess.run with list args
    - Add input validation and sanitization
    - Include type hints and docstrings
    - Use meaningful variable names
@@ -150,29 +151,61 @@ CRITICAL RULES:
 
 CODE QUALITY EXAMPLES:
 
-BAD (Don't do this):
+BAD Example 1 - Shell commands and missing types:
 ```python
-import subprocess
-result = subprocess.check_output("df -h", shell=True)  # Security risk!
-data = result.decode().split()[1]  # Will crash if format changes
+import os
+def check_temps():  # No type hint, no docstring
+    result = os.popen('sensors').read()  # NEVER use os.popen - security risk!
+    return result
 ```
 
-GOOD (Do this instead):
+GOOD Example 1 - Proper subprocess usage:
 ```python
 import subprocess
 from typing import Optional
 
-def check_disk_usage() -> Optional[str]:
-    \"\"\"Check disk usage safely.\"\"\"
+def check_temps() -> Optional[str]:
+    \"\"\"Safely check system temperatures.\"\"\"
     try:
-        result = subprocess.run(['df', '-h'], capture_output=True, text=True, check=True)
-        lines = result.stdout.strip().split('\\n')
-        if len(lines) < 2:
-            return None
-        return lines[1]
+        result = subprocess.run(['sensors'], capture_output=True, text=True, check=True)
+        return result.stdout.strip()
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"Error checking disk usage: {{e}}")
+        print(f"Error reading sensors: {{e}}")
         return None
+```
+
+BAD Example 2 - Inefficient port scanning:
+```python
+def scan_ports():  # No type hints
+    open_ports = []
+    for port in range(1, 65535):  # Scans ALL ports, takes hours!
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if sock.connect_ex(('localhost', port)) == 0:  # No timeout!
+            open_ports.append(port)
+        sock.close()
+    return open_ports
+```
+
+GOOD Example 2 - Efficient port scanning:
+```python
+import socket
+from typing import List
+
+def scan_common_ports(host: str = 'localhost', timeout: float = 0.5) -> List[int]:
+    \"\"\"Scan common ports with timeout.\"\"\"
+    common_ports = [22, 80, 443, 3306, 5432, 8080]
+    open_ports = []
+    for port in common_ports:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(timeout)
+            result = sock.connect_ex((host, port))
+            if result == 0:
+                open_ports.append(port)
+            sock.close()
+        except socket.error:
+            continue
+    return open_ports
 ```
 
 {}
@@ -596,6 +629,7 @@ CRITICAL RULES:
    - Code must be immediately executable and functional, not just a framework
    - Use proper error handling (try/except in Python, proper error checks)
    - NEVER use shell=True in subprocess - use list arguments instead
+   - NEVER use os.popen, os.system, or shell commands - use subprocess.run with list args
    - Add input validation and sanitization
    - Include type hints and docstrings
    - Use meaningful variable names
@@ -614,29 +648,61 @@ CRITICAL RULES:
 
 CODE QUALITY EXAMPLES:
 
-BAD (Don't do this):
+BAD Example 1 - Shell commands and missing types:
 ```python
-import subprocess
-result = subprocess.check_output("df -h", shell=True)  # Security risk!
-data = result.decode().split()[1]  # Will crash if format changes
+import os
+def check_temps():  # No type hint, no docstring
+    result = os.popen('sensors').read()  # NEVER use os.popen - security risk!
+    return result
 ```
 
-GOOD (Do this instead):
+GOOD Example 1 - Proper subprocess usage:
 ```python
 import subprocess
 from typing import Optional
 
-def check_disk_usage() -> Optional[str]:
-    \"\"\"Check disk usage safely.\"\"\"
+def check_temps() -> Optional[str]:
+    \"\"\"Safely check system temperatures.\"\"\"
     try:
-        result = subprocess.run(['df', '-h'], capture_output=True, text=True, check=True)
-        lines = result.stdout.strip().split('\\n')
-        if len(lines) < 2:
-            return None
-        return lines[1]
+        result = subprocess.run(['sensors'], capture_output=True, text=True, check=True)
+        return result.stdout.strip()
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"Error checking disk usage: {{e}}")
+        print(f"Error reading sensors: {{e}}")
         return None
+```
+
+BAD Example 2 - Inefficient port scanning:
+```python
+def scan_ports():  # No type hints
+    open_ports = []
+    for port in range(1, 65535):  # Scans ALL ports, takes hours!
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if sock.connect_ex(('localhost', port)) == 0:  # No timeout!
+            open_ports.append(port)
+        sock.close()
+    return open_ports
+```
+
+GOOD Example 2 - Efficient port scanning:
+```python
+import socket
+from typing import List
+
+def scan_common_ports(host: str = 'localhost', timeout: float = 0.5) -> List[int]:
+    \"\"\"Scan common ports with timeout.\"\"\"
+    common_ports = [22, 80, 443, 3306, 5432, 8080]
+    open_ports = []
+    for port in common_ports:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(timeout)
+            result = sock.connect_ex((host, port))
+            if result == 0:
+                open_ports.append(port)
+            sock.close()
+        except socket.error:
+            continue
+    return open_ports
 ```
 
 TOOL USAGE EXAMPLES:
