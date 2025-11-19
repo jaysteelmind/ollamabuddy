@@ -127,6 +127,7 @@ CRITICAL RULES:
 2. End your response with valid JSON on its own line
 3. Use exact tool names from the list above
 4. Provide all required arguments as specified
+5. When writing code files: Use proper quote nesting (e.g., f"text {{func('arg')}}" not f'text {{func('arg')}}'). Ensure all code is syntactically valid.
 
 {}
 
@@ -543,6 +544,7 @@ CRITICAL RULES:
 2. End your response with valid JSON on its own line
 3. Use exact tool names from the list above
 4. Provide all required arguments as specified
+5. When writing code files: Use proper quote nesting (e.g., f"text {{func('arg')}}" not f'text {{func('arg')}}'). Ensure all code is syntactically valid.
 5. For shell commands with pipes/redirects, use run_command with full command string
 
 EXAMPLES:
