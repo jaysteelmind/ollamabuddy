@@ -155,8 +155,18 @@ PLANNING GUIDELINES:
    - Quote escaping in code generation
    - Path handling (~/  vs absolute paths)
    - File/directory existence checks
-5. Keep steps atomic and testable
-6. List steps in proper execution order
+5. When generating code, plan for:
+   - Proper error handling (try/except, error checks)
+   - Security (avoid shell=True, validate inputs, use subprocess.run with list args)
+   - Code quality (type hints, docstrings, meaningful variable names)
+   - Logging and debugging capabilities
+   - Edge case handling
+6. Include validation/testing steps:
+   - Verify code runs without errors
+   - Test edge cases
+   - Check security vulnerabilities
+7. Keep steps atomic and testable
+8. List steps in proper execution order
 
 OUTPUT FORMAT:
 Return ONLY a JSON array of step descriptions. Each step should be a clear, actionable task.

@@ -127,7 +127,48 @@ CRITICAL RULES:
 2. End your response with valid JSON on its own line
 3. Use exact tool names from the list above
 4. Provide all required arguments as specified
-5. When writing code files: Use proper quote nesting (e.g., f"text {{func('arg')}}" not f'text {{func('arg')}}'). Ensure all code is syntactically valid.
+5. When writing code files:
+   - Use proper error handling (try/except in Python, proper error checks)
+   - NEVER use shell=True in subprocess - use list arguments instead
+   - Add input validation and sanitization
+   - Include type hints and docstrings
+   - Use meaningful variable names
+   - Add comments for complex logic
+   - Ensure code is production-ready, not just syntactically valid
+   - Handle edge cases (empty inputs, missing files, permission errors)
+   - Add logging for debugging
+6. Before marking task complete, verify:
+   - Code runs without errors
+   - All edge cases are handled
+   - No security vulnerabilities
+   - Code follows best practices
+
+CODE QUALITY EXAMPLES:
+
+BAD (Don't do this):
+```python
+import subprocess
+result = subprocess.check_output("df -h", shell=True)  # Security risk!
+data = result.decode().split()[1]  # Will crash if format changes
+```
+
+GOOD (Do this instead):
+```python
+import subprocess
+from typing import Optional
+
+def check_disk_usage() -> Optional[str]:
+    \"\"\"Check disk usage safely.\"\"\"
+    try:
+        result = subprocess.run(['df', '-h'], capture_output=True, text=True, check=True)
+        lines = result.stdout.strip().split('\\n')
+        if len(lines) < 2:
+            return None
+        return lines[1]
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"Error checking disk usage: {{e}}")
+        return None
+```
 
 {}
 
@@ -544,10 +585,51 @@ CRITICAL RULES:
 2. End your response with valid JSON on its own line
 3. Use exact tool names from the list above
 4. Provide all required arguments as specified
-5. When writing code files: Use proper quote nesting (e.g., f"text {{func('arg')}}" not f'text {{func('arg')}}'). Ensure all code is syntactically valid.
-5. For shell commands with pipes/redirects, use run_command with full command string
+5. When writing code files:
+   - Use proper error handling (try/except in Python, proper error checks)
+   - NEVER use shell=True in subprocess - use list arguments instead
+   - Add input validation and sanitization
+   - Include type hints and docstrings
+   - Use meaningful variable names
+   - Add comments for complex logic
+   - Ensure code is production-ready, not just syntactically valid
+   - Handle edge cases (empty inputs, missing files, permission errors)
+   - Add logging for debugging
+6. Before marking task complete, verify:
+   - Code runs without errors
+   - All edge cases are handled
+   - No security vulnerabilities
+   - Code follows best practices
+7. For shell commands with pipes/redirects, use run_command with full command string
 
-EXAMPLES:
+CODE QUALITY EXAMPLES:
+
+BAD (Don't do this):
+```python
+import subprocess
+result = subprocess.check_output("df -h", shell=True)  # Security risk!
+data = result.decode().split()[1]  # Will crash if format changes
+```
+
+GOOD (Do this instead):
+```python
+import subprocess
+from typing import Optional
+
+def check_disk_usage() -> Optional[str]:
+    \"\"\"Check disk usage safely.\"\"\"
+    try:
+        result = subprocess.run(['df', '-h'], capture_output=True, text=True, check=True)
+        lines = result.stdout.strip().split('\\n')
+        if len(lines) < 2:
+            return None
+        return lines[1]
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"Error checking disk usage: {{e}}")
+        return None
+```
+
+TOOL USAGE EXAMPLES:
 
 Example 1:
 I need to see what files are in the src directory to understand the project structure.
