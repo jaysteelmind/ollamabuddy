@@ -5,3 +5,4 @@ test_*.log
 build_check.log
 src/main.rs.backup
 INVESTIGATION_FINDINGS.md
+tests/meta_prompt_investigation/
