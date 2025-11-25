@@ -5,7 +5,7 @@ Created by:Jerome Naidoo
 [![Tests](https://img.shields.io/badge/tests-454%20passing-brightgreen.svg)](.)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Install in one line:** - 
+**Install in one line** **-** **-** 
 **Then run: ollama start**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/jaysteelmind/ollamabuddy/master/install.sh | sh
