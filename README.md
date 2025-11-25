@@ -1,5 +1,5 @@
 # OllamaBuddy v0.6.0 - Intelligent Terminal Agent with Long-Term Memory
-Created by:Jerome Naidoo
+Created by: **Jerome Naidoo**
 
 [![Rust](https://img.shields.io/badge/rust-1.91%2B-orange.svg)](https://www.rust-lang.org/)
 [![Tests](https://img.shields.io/badge/tests-454%20passing-brightgreen.svg)](.)
