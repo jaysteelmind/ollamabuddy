@@ -127,11 +127,21 @@ check_dependencies() {
 
 check_ollama() {
     print_step "Checking for Ollama..."
-    
+
     if command_exists ollama; then
         OLLAMA_VERSION=$(ollama --version 2>/dev/null || echo "unknown")
         print_success "Ollama is installed (${OLLAMA_VERSION})"
-        return 0
+
+        # Functional test: verify Ollama actually works
+        print_info "Testing Ollama functionality..."
+        if ollama list >/dev/null 2>&1; then
+            print_success "Ollama is functional"
+            return 0
+        else
+            print_warning "Ollama binary exists but is not functional"
+            print_info "Will attempt reinstallation"
+            return 1
+        fi
     else
         print_warning "Ollama is not installed"
         return 1
@@ -140,12 +150,12 @@ check_ollama() {
 
 install_ollama() {
     print_step "Installing Ollama..."
-    
+
     case "$OS" in
         linux)
             print_info "Installing Ollama for Linux..."
             if curl -fsSL https://ollama.com/install.sh | sh; then
-                print_success "Ollama installed successfully"
+                print_info "Ollama installer completed"
             else
                 print_error "Failed to install Ollama"
                 print_info "Please install manually from: https://ollama.com/download"
@@ -156,7 +166,7 @@ install_ollama() {
             print_info "Installing Ollama for macOS..."
             if command_exists brew; then
                 if brew install ollama; then
-                    print_success "Ollama installed via Homebrew"
+                    print_info "Homebrew installation completed"
                 else
                     print_error "Failed to install Ollama via Homebrew"
                     exit 1
@@ -169,6 +179,36 @@ install_ollama() {
             fi
             ;;
     esac
+
+    # POST-INSTALL VERIFICATION
+    print_step "Verifying Ollama installation..."
+
+    # Refresh PATH to pick up newly installed binary
+    export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
+    hash -r 2>/dev/null || true
+
+    # Check if binary exists
+    if command -v ollama >/dev/null 2>&1; then
+        OLLAMA_VERSION=$(ollama --version 2>/dev/null || echo "unknown")
+        print_success "Ollama binary verified (${OLLAMA_VERSION})"
+
+        # Check if systemd service was created (Linux only)
+        if [ "$OS" = "linux" ] && command_exists systemctl; then
+            if systemctl list-unit-files 2>/dev/null | grep -q "ollama.service"; then
+                print_success "Ollama systemd service detected"
+            else
+                print_warning "Ollama systemd service not found (will use manual start)"
+            fi
+        fi
+    else
+        print_error "Ollama binary not found after installation"
+        print_info "Tried paths: /usr/local/bin/ollama, /usr/bin/ollama"
+        print_info "Current PATH: $PATH"
+        print_info "Please install manually from: https://ollama.com/download"
+        exit 1
+    fi
+
+    print_success "Ollama installation verified"
 }
 
 check_ollama_running() {
@@ -181,45 +221,91 @@ check_ollama_running() {
 
 start_ollama() {
     print_step "Starting Ollama service..."
-    
+
+    OLLAMA_LOG="/tmp/ollama-install.log"
+
     case "$OS" in
         linux)
             if command_exists systemctl; then
-                if sudo systemctl start ollama 2>/dev/null; then
-                    print_info "Started Ollama via systemd"
+                # Check if systemd service exists before trying to start
+                if systemctl list-unit-files 2>/dev/null | grep -q "ollama.service"; then
+                    print_info "Attempting to start Ollama via systemd..."
+                    if sudo systemctl start ollama 2>&1 | tee -a "$OLLAMA_LOG"; then
+                        print_success "Started Ollama via systemd"
+                    else
+                        print_warning "Failed to start via systemd (see $OLLAMA_LOG)"
+                        print_info "Trying background start..."
+                        nohup ollama serve >>"$OLLAMA_LOG" 2>&1 &
+                        OLLAMA_PID=$!
+                        print_info "Started background process (PID: $OLLAMA_PID, log: $OLLAMA_LOG)"
+                    fi
                 else
+                    print_warning "Ollama systemd service not found"
                     print_info "Starting Ollama in background..."
-                    nohup ollama serve >/dev/null 2>&1 &
+                    nohup ollama serve >>"$OLLAMA_LOG" 2>&1 &
+                    OLLAMA_PID=$!
+                    print_info "Started background process (PID: $OLLAMA_PID, log: $OLLAMA_LOG)"
                 fi
             else
-                print_info "Starting Ollama in background..."
-                nohup ollama serve >/dev/null 2>&1 &
+                print_info "systemctl not available, starting in background..."
+                nohup ollama serve >>"$OLLAMA_LOG" 2>&1 &
+                OLLAMA_PID=$!
+                print_info "Started background process (PID: $OLLAMA_PID, log: $OLLAMA_LOG)"
             fi
             ;;
         darwin)
             print_info "Starting Ollama..."
             if [ -d "/Applications/Ollama.app" ]; then
-                open -a Ollama 2>/dev/null || nohup ollama serve >/dev/null 2>&1 &
+                open -a Ollama 2>&1 | tee -a "$OLLAMA_LOG" || {
+                    print_warning "Failed to open Ollama.app"
+                    print_info "Starting in background..."
+                    nohup ollama serve >>"$OLLAMA_LOG" 2>&1 &
+                    OLLAMA_PID=$!
+                    print_info "Started background process (PID: $OLLAMA_PID, log: $OLLAMA_LOG)"
+                }
             else
-                nohup ollama serve >/dev/null 2>&1 &
+                nohup ollama serve >>"$OLLAMA_LOG" 2>&1 &
+                OLLAMA_PID=$!
+                print_info "Started background process (PID: $OLLAMA_PID, log: $OLLAMA_LOG)"
             fi
             ;;
     esac
-    
-    print_info "Waiting for Ollama to start..."
+
+    # Verify background process is running if we started one
+    if [ -n "$OLLAMA_PID" ]; then
+        sleep 2
+        if ps -p $OLLAMA_PID >/dev/null 2>&1; then
+            print_success "Ollama process verified running (PID: $OLLAMA_PID)"
+        else
+            print_error "Ollama process failed to start"
+            print_info "Check logs at: $OLLAMA_LOG"
+            print_info "Last 10 lines of log:"
+            tail -10 "$OLLAMA_LOG" 2>/dev/null || echo "  (log file empty or not found)"
+            exit 1
+        fi
+    fi
+
+    print_info "Waiting for Ollama HTTP API to respond..."
     for i in {1..30}; do
         if check_ollama_running; then
-            print_success "Ollama is running"
+            print_success "Ollama is running and responding"
             return 0
         fi
         sleep 1
         echo -n "."
     done
-    
+
     echo ""
-    print_error "Failed to start Ollama automatically"
-    print_info "Please start Ollama manually with: ollama serve"
-    print_info "Then run this installer again"
+    print_error "Ollama failed to respond after 30 seconds"
+    print_info "Debug information:"
+    print_info "  - Check if process is running: ps aux | grep ollama"
+    print_info "  - Check logs at: $OLLAMA_LOG"
+    print_info "  - Try starting manually: ollama serve"
+    print_info "  - Check port 11434: curl http://127.0.0.1:11434/api/tags"
+    if [ -f "$OLLAMA_LOG" ]; then
+        print_info "Last 10 lines of log:"
+        tail -10 "$OLLAMA_LOG"
+    fi
     exit 1
 }
 
@@ -304,18 +390,28 @@ install_binary() {
 
 check_model() {
     print_step "Checking for models..."
-    
+
+    # Check if Ollama is responding first
+    if ! check_ollama_running; then
+        print_error "Cannot check models: Ollama is not running"
+        print_info "Ensure Ollama is running with: ollama serve"
+        return 1
+    fi
+
     # Check if any qwen2.5 model exists
-    if ollama list 2>/dev/null | grep -q "qwen2.5"; then
-        EXISTING_MODEL=$(ollama list 2>/dev/null | grep "qwen2.5" | head -1 | awk '{print $1}')
+    MODEL_LIST=$(ollama list 2>&1)
+    if echo "$MODEL_LIST" | grep -q "qwen2.5"; then
+        EXISTING_MODEL=$(echo "$MODEL_LIST" | grep "qwen2.5" | head -1 | awk '{print $1}')
         print_success "Found existing model: ${EXISTING_MODEL}"
         print_info "Will use ${EXISTING_MODEL} as default"
         return 0
-    elif ollama list 2>/dev/null | grep -q "$DEFAULT_MODEL"; then
+    elif echo "$MODEL_LIST" | grep -q "$DEFAULT_MODEL"; then
         print_success "Model ${DEFAULT_MODEL} is already installed"
         return 0
     else
         print_warning "No qwen2.5 models installed"
+        print_info "Available models:"
+        echo "$MODEL_LIST" | head -10
         return 1
     fi
 }
@@ -324,12 +420,42 @@ pull_model() {
     print_step "Downloading model (${DEFAULT_MODEL})..."
     print_info "This may take a few minutes depending on your connection..."
     print_info "Model size: approximately 3.8 GB"
-    
-    if ollama pull "$DEFAULT_MODEL"; then
+
+    # Check available disk space (rough check)
+    AVAILABLE_SPACE_KB=$(df -k "$HOME" 2>/dev/null | awk 'NR==2 {print $4}')
+    if [ -n "$AVAILABLE_SPACE_KB" ] && [ "$AVAILABLE_SPACE_KB" -lt 4000000 ]; then
+        print_warning "Low disk space detected (less than 4 GB available)"
+        print_info "Model download requires approximately 3.8 GB"
+        print_info "Available space: $(($AVAILABLE_SPACE_KB / 1024 / 1024)) GB"
+    fi
+
+    # Check if Ollama is responding
+    if ! check_ollama_running; then
+        print_error "Cannot pull model: Ollama is not running"
+        print_info "Start Ollama with: ollama serve"
+        print_info "Then pull model with: ollama pull ${DEFAULT_MODEL}"
+        return 1
+    fi
+
+    if ollama pull "$DEFAULT_MODEL" 2>&1; then
         print_success "Model downloaded successfully"
+
+        # Verify model is actually available
+        if ollama list 2>/dev/null | grep -q "$DEFAULT_MODEL"; then
+            print_success "Model verified in local repository"
+        else
+            print_warning "Model pull completed but not found in list"
+            print_info "Run 'ollama list' to check available models"
+        fi
     else
         print_error "Failed to download model"
+        print_info "Common issues:"
+        print_info "  - Network connectivity problems"
+        print_info "  - Insufficient disk space"
+        print_info "  - Ollama service not responding"
         print_info "You can download it later with: ollama pull ${DEFAULT_MODEL}"
+        print_info "Check Ollama logs at: /tmp/ollama-install.log"
+        return 1
     fi
 }
 
