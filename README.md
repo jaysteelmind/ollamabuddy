@@ -6,11 +6,10 @@ Created by:Jerome Naidoo
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **Install in one line:**
+**Then run: ollama start**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/jaysteelmind/ollamabuddy/master/install.sh | sh
 ```
-
-The run: ollama start
 
 A production-ready Rust terminal agent that transforms local Ollama language models into capable autonomous assistants with **permanent memory**, **semantic search**, and **cross-session learning**.
 
